@@ -21,6 +21,18 @@
     
   <!-- title -->
   <title>Quick save app</title>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-KLFDM7CYXP"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KLFDM7CYXP');
+  </script>
+
+
 </head>
 <body class="position-relative index-page dark-theme" id="index-page">
 
