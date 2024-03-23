@@ -1,0 +1,1 @@
+This app lets you save short notes which you can share or view later with uniquely generated four character code
