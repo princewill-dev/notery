@@ -27,7 +27,7 @@ Route::post('/savewriteup', [SaveController::class, 'saveFunction']);
 // Route::get('/{code}', [SaveController::class, 'findFromUrl']); 
 
 //this shows the find-writeup page where someone can enter a unique code
-Route::get('/writeup/find', [PageController::class, 'findFunction']);
+Route::get('/find', [PageController::class, 'findFunction']);
 
 //this redirects to the show-writeup page when clicked from the success page after saving writeup
 Route::get('/find/{code}', [SaveController::class, 'findFromUrl']);
