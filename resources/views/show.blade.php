@@ -38,7 +38,7 @@
                         <div class="row small-gutters mt-2">
                         <div class="col-12">
                             <a href="/" class="btn btn-outline-dark level-up shadow-off w-100 font-500">save another</a>
-                            <a href="/writeup/find" class="btn btn-outline-dark level-up shadow-off w-100 font-500">find saved items</a>
+                            <a href="/find" class="btn btn-outline-dark level-up shadow-off w-100 font-500">find saved items</a>
                         </div>
                         </div>
                         

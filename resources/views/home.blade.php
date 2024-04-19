@@ -35,7 +35,7 @@
                         <div class="row small-gutters mt-2">
                         <div class="col-12">
                             <a href="/" class="btn btn-outline-dark level-up shadow-off w-100 font-500">save another</a>
-                            <a href="/writeup/find" class="btn btn-outline-dark level-up shadow-off w-100 font-500">find saved items</a>
+                            <a href="/find" class="btn btn-outline-dark level-up shadow-off w-100 font-500">find saved items</a>
                         </div>
                         </div>
                     </form>
@@ -59,7 +59,7 @@
                         <div class="hr position-relative"><span>Or find a note</span></div>
                         <div class="row small-gutters mt-2">
                         <div class="col-12">
-                            <a href="/writeup/find" class="btn btn-outline-dark level-up shadow-off w-100 font-500">Find note</a>
+                            <a href="/find" class="btn btn-outline-dark level-up shadow-off w-100 font-500">Find note</a>
                         </div>
                         </div>
                         <div class="form-comment mt-2">Create a quick note and get 4 digit pin</div>
