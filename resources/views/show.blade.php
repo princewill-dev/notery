@@ -27,8 +27,8 @@
                         @csrf
                         <p class="para-1 mb-2 mx-xl-0 mx-auto">here is your note</p>
                         
-                        <div class="" style="padding: 20px; background: #fff;">
-                            <p>{{ $decryptedText }}</p>
+                        <div class="" >
+                            <textarea style="padding: 10px; background: #fff;" cols="35" rows="10">{{ $decryptedText }}</textarea>
                         </div>
 
                         <br>
