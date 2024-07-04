@@ -23,7 +23,7 @@
                             <br>
                         </div>
                         <br>
-                        <a href="/find/{{ session('code') }}" class="btn btn-outline-dark level-up shadow-off w-100 font-500">view saved</a>
+                        <a href="/find/{{ $code }}" class="btn btn-outline-dark level-up shadow-off w-100 font-500">view saved</a>
                         <br>
                         <br>
                         <div class="hr position-relative"><span>Or you can</span></div>

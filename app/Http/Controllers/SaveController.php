@@ -39,7 +39,7 @@ class SaveController extends Controller
     }
     
 
-    public function findFromUrl($code) {
+    public function findFromUrl(Request $request, $code) {
         
         $hashedCode = hash('sha256', $code); // Hash the input code for lookup
     
@@ -52,15 +52,17 @@ class SaveController extends Controller
                 $decryptedText = Crypt::decryptString($encryptedData->writeup);
                 return view('show', compact('decryptedText'));
             } catch (\Exception $e) {
-                $errorMessage = 'Decryption of the write-up failed.';
-                return view('find', compact('errorMessage'));
+                $errorMessage = 'Invalid code';
+                $request->session()->flash('errorMessage', $errorMessage);
+                return view('find')->with('error', ' Invalid code');
             }
         } else {
-            $errorMessage = 'Invalid code. The note does not exist.';
-            return view('find', compact('errorMessage'));
+            $errorMessage = 'Invalid code';
+            $request->session()->flash('errorMessage', $errorMessage);
+            return view('find')->with('error', ' Invalid code');
         }
-
     }
+    
 
     
     public function findWriteupFunction(Request $request){
@@ -81,12 +83,14 @@ class SaveController extends Controller
                 $decryptedText = Crypt::decryptString($encryptedData->writeup);
                 return view('show', compact('decryptedText'));
             } catch (\Exception $e) {
-                $errorMessage = 'Decryption of the write-up failed.';
-                return view('find', compact('errorMessage'));
+                $errorMessage = 'Invalid code';
+                $request->session()->flash('errorMessage', $errorMessage);
+                return view('find')->with('error', ' Invalid code');
             }
         } else {
-            $errorMessage = 'Invalid code. The note does not exist.';
-            return view('find', compact('errorMessage'));
+            $errorMessage = 'Invalid code';
+            $request->session()->flash('errorMessage', $errorMessage);
+            return view('find')->with('error', ' Invalid code');
         }
     }
     
