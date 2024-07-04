@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('saves', function (Blueprint $table) {
             $table->id();
-            $table->string('code');
+            $table->string('code', 255);
             $table->longText('writeup');
             $table->timestamps();
         });

@@ -21,7 +21,7 @@ use App\Http\Controllers\SaveController;
 Route::get('/', [PageController::class, 'home']); 
 
 //this save a submitted writeup
-Route::post('/savewriteup', [SaveController::class, 'saveFunction']); 
+Route::post('/', [SaveController::class, 'saveFunction']); 
 
 //this help to find a write when the unique code is appended on the url eg: savewriteup.com/1234
 // Route::get('/{code}', [SaveController::class, 'findFromUrl']); 
@@ -33,8 +33,7 @@ Route::get('/find', [PageController::class, 'findFunction']);
 Route::get('/find/{code}', [SaveController::class, 'findFromUrl']);
 
 //this shows a writeup when a unique code is submitted from the find page
-Route::post('/findwriteupform', [SaveController::class, 'findWriteupFunction']);
-
+Route::post('/find', [SaveController::class, 'findWriteupFunction']);
 
 //Route::post('/findwriteup/{code}', [SaveController::class, 'findWriteup']);
 

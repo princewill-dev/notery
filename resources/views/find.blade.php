@@ -15,10 +15,10 @@
               <!-- form-container -->
               <div class="form-container" id="form-container">
                 <!-- header-form -->
-                <form action="/findwriteupform" method="POST" class="header-form ml-auto" id="header-form">
+                <form action="/find" method="POST" class="header-form ml-auto" id="header-form">
                   @csrf
 
-                  {{-- <p style="color: #ffffff; padding: 5px; background: red;">{{ $errorMessage  }}</p> --}}
+                  <p style="color: #ffffff; padding: 5px; background: red;">{{ $errorMessage  }}</p>
 
                   <!-- form-title -->
                   <h2 class="form-title mb-2">retrieve notes</h2>
