@@ -10,7 +10,7 @@
             
             <div class="col-xl-5 ">
                 <div class="form-container" id="form-container">
-                    <form action="/" method="POST" class="header-form mx-auto" id="header-form">
+                    <form action="/save" method="POST" class="header-form mx-auto" id="header-form">
                         @csrf
                         
                         <p class="para-1 mb-2 mx-xl-0 mx-auto">save and retrieve notes anonymously <br> with a 4 digit code</p>

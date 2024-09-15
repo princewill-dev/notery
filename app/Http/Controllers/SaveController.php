@@ -9,9 +9,19 @@ use Illuminate\Support\Facades\Log;
 
 class SaveController extends Controller
 {
+
+    public function home()
+    {
+        return view('home'); // Adjust the view name as needed
+    }
+
+    public function findFunction() {
+        return view('find');
+    }
+
     public function saveFunction(Request $request) {
         // This function generates a unique 4-digit code
-        function generateRandomString($length = 5){
+        function generateRandomString($length = 4){
             $a = '1234567890';
             $characterLength = strlen($a);
             $randomString = '';
@@ -20,15 +30,20 @@ class SaveController extends Controller
             }
             return $randomString;
         }
-        $code = generateRandomString();
-    
+
+        // Ensure the generated code is unique
+        do {
+            $code = generateRandomString();
+            $hashedCode = hash('sha256', $code);
+            $existingCode = Save::where('code', $hashedCode)->first();
+        } while ($existingCode);
+
         // Validate the submitted write-up
         $validateData = $request->validate([
             'writeup' => 'required|max:2000|string',
         ]);
     
         $encryptedContent = Crypt::encryptString($validateData['writeup']);
-        $hashedCode = hash('sha256', $code); // Hash the code
     
         $contentdata = new Save;
         $contentdata->writeup = $encryptedContent;
@@ -39,7 +54,14 @@ class SaveController extends Controller
     }
     
 
-    public function findFromUrl(Request $request, $code) {
+    public function findWriteup(Request $request, $code = null) {
+        if ($code === null) {
+            // Validate the form input
+            $request->validate([
+                'code' => 'required|string',
+            ]);
+            $code = $request->input('code');
+        }
         
         $hashedCode = hash('sha256', $code); // Hash the input code for lookup
     
@@ -50,47 +72,17 @@ class SaveController extends Controller
             // If the write-up exists, display it
             try {
                 $decryptedText = Crypt::decryptString($encryptedData->writeup);
+                $encryptedData->delete(); // Delete the record after viewing
                 return view('show', compact('decryptedText'));
             } catch (\Exception $e) {
                 $errorMessage = 'Invalid code';
                 $request->session()->flash('errorMessage', $errorMessage);
-                return view('find')->with('error', ' Invalid code');
+                return view('find')->with('error', 'Invalid code');
             }
         } else {
             $errorMessage = 'Invalid code';
             $request->session()->flash('errorMessage', $errorMessage);
-            return view('find')->with('error', ' Invalid code');
-        }
-    }
-    
-
-    
-    public function findWriteupFunction(Request $request){
-        // Validate the form input
-        $request->validate([
-            'code' => 'required|string',
-        ]);
-    
-        $code = $request->input('code');
-        $hashedCode = hash('sha256', $code); // Hash the input code for lookup
-    
-        // Retrieve the write-up associated with the provided code
-        $encryptedData = Save::where('code', $hashedCode)->first();
-    
-        if ($encryptedData) {
-            // If the write-up exists, display it
-            try {
-                $decryptedText = Crypt::decryptString($encryptedData->writeup);
-                return view('show', compact('decryptedText'));
-            } catch (\Exception $e) {
-                $errorMessage = 'Invalid code';
-                $request->session()->flash('errorMessage', $errorMessage);
-                return view('find')->with('error', ' Invalid code');
-            }
-        } else {
-            $errorMessage = 'Invalid code';
-            $request->session()->flash('errorMessage', $errorMessage);
-            return view('find')->with('error', ' Invalid code');
+            return view('find')->with('error', 'Invalid code');
         }
     }
     
