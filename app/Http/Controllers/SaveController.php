@@ -40,7 +40,7 @@ class SaveController extends Controller
 
         // Validate the submitted write-up
         $validateData = $request->validate([
-            'writeup' => 'required|max:2000|string',
+            'writeup' => 'required|string',
         ]);
     
         $encryptedContent = Crypt::encryptString($validateData['writeup']);
