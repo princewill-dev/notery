@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Save;
+use App\Models\Stats;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -49,6 +50,9 @@ class SaveController extends Controller
         $contentdata->writeup = $encryptedContent;
         $contentdata->code = $hashedCode; // Store the hashed code
         $contentdata->save();
+        
+        // Increment the saves counter
+        Stats::incrementSaves();
     
         return view('code', compact('code'));
     }
@@ -73,6 +77,10 @@ class SaveController extends Controller
             try {
                 $decryptedText = Crypt::decryptString($encryptedData->writeup);
                 $encryptedData->delete(); // Delete the record after viewing
+                
+                // Increment the decodes counter
+                Stats::incrementDecodes();
+                
                 return view('show', compact('decryptedText'));
             } catch (\Exception $e) {
                 $errorMessage = 'Invalid code';
