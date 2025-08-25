@@ -9,5 +9,5 @@ class Save extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['code', 'content'];
+    protected $fillable = ['code', 'writeup', 'image', 'image_mime'];
 }

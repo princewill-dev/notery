@@ -14,6 +14,14 @@
                                 </div>
                                 <button type="button" id="toggleExpand" style="margin-top: 8px; background:#1f2537; color:#e6e9ef; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:8px 12px; font-size: 13px;">Expand</button>
                             </div>
+                            @if(!empty($imageDataUri))
+                            <div style="margin-top:12px;">
+                                <div style="color:#aab3c0; font-size: 13px; margin-bottom:6px;">Attached image</div>
+                                <div style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.02); padding: 8px; text-align:center;">
+                                    <img src="{{ $imageDataUri }}" alt="Attached image" style="max-width:100%; height:auto; border-radius:8px;" />
+                                </div>
+                            </div>
+                            @endif
                             <div style="display:flex; gap:10px; margin-top: 12px;">
                                 <button type="button" id="copyButton" style="flex:1; background: linear-gradient(135deg,#6a5af9,#00c2ff); color:#0b0f1a; border:none; border-radius:10px; padding: 10px 14px; font-weight: 700; letter-spacing: .2px; box-shadow: 0 6px 18px rgba(0,194,255,0.25);">Copy</button>
                                 <a href="/" style="flex:1; text-align:center; background:#1f2537; color:#e6e9ef; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px 14px; text-decoration:none; font-weight:600;">Save another</a>

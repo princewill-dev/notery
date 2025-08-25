@@ -40,9 +40,10 @@ class SaveController extends Controller
             $existingCode = Save::where('code', $hashedCode)->first();
         } while ($existingCode);
 
-        // Validate the submitted write-up
+        // Validate the submitted data: write-up required, image optional
         $validateData = $request->validate([
             'writeup' => 'required|string',
+            'image' => 'nullable|image|max:10240', // up to 10MB images
         ]);
     
         $encryptedContent = Crypt::encryptString($validateData['writeup']);
@@ -50,6 +51,16 @@ class SaveController extends Controller
         $contentdata = new Save;
         $contentdata->writeup = $encryptedContent;
         $contentdata->code = $hashedCode; // Store the hashed code
+        // Optional image handling
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+            $imageFile = $request->file('image');
+            $mime = $imageFile->getMimeType();
+            $raw = file_get_contents($imageFile->getRealPath());
+            $base64 = base64_encode($raw);
+            $encryptedImage = Crypt::encryptString($base64);
+            $contentdata->image = $encryptedImage;
+            $contentdata->image_mime = $mime;
+        }
         $contentdata->save();
         
         // Increment the saves counter
@@ -79,12 +90,22 @@ class SaveController extends Controller
             // If the write-up exists, display it
             try {
                 $decryptedText = Crypt::decryptString($encryptedData->writeup);
+                // Prepare optional image for display
+                $imageDataUri = null;
+                if (!empty($encryptedData->image) && !empty($encryptedData->image_mime)) {
+                    try {
+                        $imgBase64 = Crypt::decryptString($encryptedData->image);
+                        $imageDataUri = 'data:' . $encryptedData->image_mime . ';base64,' . $imgBase64;
+                    } catch (\Exception $e) {
+                        // ignore image decrypt errors
+                    }
+                }
                 $encryptedData->delete(); // Delete the record after viewing
                 
                 // Increment the decodes counter
                 Stats::incrementDecodes();
                 
-                return view('show', compact('decryptedText'));
+                return view('show', compact('decryptedText', 'imageDataUri'));
             } catch (\Exception $e) {
                 $errorMessage = 'Invalid code';
                 $request->session()->flash('errorMessage', $errorMessage);

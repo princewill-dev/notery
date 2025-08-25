@@ -9,7 +9,7 @@
 
                 <div class="col-xl-5 ">
                     <div class="form-container" id="form-container" style="background: #0f1222; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); padding: 22px; backdrop-filter: blur(6px);">
-                        <form action="/save" method="POST" class="header-form mx-auto" id="header-form">
+                        <form action="/save" method="POST" class="header-form mx-auto" id="header-form" enctype="multipart/form-data">
                             @csrf
                             @if(session('saved') && session('code'))
                             <div
@@ -28,6 +28,12 @@
                                 <textarea name="writeup" id="" cols="35" rows="8" class="glassy form-control" required
                                     style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 12px;"
                                     placeholder="type something"></textarea>
+                            </div>
+                            <div class="inputs" style="margin-top: 10px;">
+                                <label for="image" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional image</label>
+                                <input type="file" name="image" id="image" accept="image/*" class="form-control"
+                                    style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
+                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">Max 10MB. JPG, PNG, GIF, etc.</div>
                             </div>
                             <button type="submit"
                                 class="w-100 font-500 mb-2 mt-2"
