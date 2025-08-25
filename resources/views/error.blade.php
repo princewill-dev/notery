@@ -15,8 +15,7 @@
               <!-- form-container -->
               <div class="form-container" id="form-container">
                 <!-- header-form -->
-                <form action="/findwriteupform" method="POST" class="header-form ml-auto" id="header-form">
-                  @csrf
+                <form action="/" method="GET" class="header-form ml-auto" id="header-form">
 
                   <p style="color: #ffffff; padding: 5px; background: red;">{{ $errorMessage  }}</p>
 

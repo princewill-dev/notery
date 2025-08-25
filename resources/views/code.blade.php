@@ -23,14 +23,14 @@
                             <br>
                         </div>
                         <br>
-                        <a href="/find/{{ $code }}" class="btn btn-outline-dark level-up shadow-off w-100 font-500">view saved</a>
+                        <a href="/{{ $code }}" class="btn btn-outline-dark level-up shadow-off w-100 font-500">view saved</a>
                         <br>
                         <br>
                         <div class="hr position-relative"><span>Or you can</span></div>
                         <div class="row small-gutters mt-2">
                         <div class="col-12">
                             <a href="/" class="btn btn-outline-dark level-up shadow-off w-100 font-500">save another</a>
-                            <a href="/find" class="btn btn-outline-dark level-up shadow-off w-100 font-500">find saved items</a>
+                            <a href="/" class="btn btn-outline-dark level-up shadow-off w-100 font-500">find saved items</a>
                         </div>
                         </div>
                     </form>
@@ -48,6 +48,7 @@
 
 
     </x-layout>
+
 
 
 

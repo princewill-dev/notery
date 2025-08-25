@@ -11,13 +11,14 @@ use Illuminate\Support\Facades\Log;
 class SaveController extends Controller
 {
 
-    public function home()
+    public function home(Request $request)
     {
-        return view('home'); // Adjust the view name as needed
-    }
-
-    public function findFunction() {
-        return view('find');
+        // If a code query param is provided, and it is a 4-digit number, redirect to /{code}
+        $code = $request->query('code');
+        if ($code !== null && preg_match('/^\d{4}$/', $code)) {
+            return redirect('/' . $code);
+        }
+        return view('home');
     }
 
     public function saveFunction(Request $request) {
@@ -54,7 +55,9 @@ class SaveController extends Controller
         // Increment the saves counter
         Stats::incrementSaves();
     
-        return view('code', compact('code'));
+        return redirect('/')
+            ->with('saved', true)
+            ->with('code', $code);
     }
     
 
@@ -85,12 +88,12 @@ class SaveController extends Controller
             } catch (\Exception $e) {
                 $errorMessage = 'Invalid code';
                 $request->session()->flash('errorMessage', $errorMessage);
-                return view('find')->with('error', 'Invalid code');
+                return view('error', compact('errorMessage'));
             }
         } else {
             $errorMessage = 'Invalid code';
             $request->session()->flash('errorMessage', $errorMessage);
-            return view('find')->with('error', 'Invalid code');
+            return view('error', compact('errorMessage'));
         }
     }
     
