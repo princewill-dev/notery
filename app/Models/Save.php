@@ -9,5 +9,10 @@ class Save extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['code', 'writeup', 'image', 'image_mime'];
+    protected $fillable = ['code', 'writeup'];
+
+    public function images()
+    {
+        return $this->hasMany(SaveImage::class);
+    }
 }

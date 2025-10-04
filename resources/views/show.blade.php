@@ -14,12 +14,26 @@
                                 </div>
                                 <button type="button" id="toggleExpand" style="margin-top: 8px; background:#1f2537; color:#e6e9ef; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:8px 12px; font-size: 13px;">Expand</button>
                             </div>
-                            @if(!empty($imageDataUri))
+                            @if(!empty($attachments))
                             <div style="margin-top:12px;">
-                                <div style="color:#aab3c0; font-size: 13px; margin-bottom:6px;">Attached image</div>
-                                <div style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.02); padding: 8px; text-align:center;">
-                                    <img src="{{ $imageDataUri }}" alt="Attached image" style="max-width:100%; height:auto; border-radius:8px;" />
-                                </div>
+                                <div style="color:#aab3c0; font-size: 13px; margin-bottom:6px;">Attachments ({{ count($attachments) }})</div>
+                                <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px;">
+                                    @foreach($attachments as $idx => $att)
+                                        @php 
+                                            $mime = $att['mime'] ?? 'application/octet-stream'; 
+                                            $size = $att['size'] ?? null;
+                                            $sizeKB = $size ? number_format($size / 1024, 1) . ' KB' : '';
+                                        @endphp
+                                        <li style="display:flex; align-items:center; justify-content:space-between; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.02); padding: 10px;">
+                                            <div style="color:#e6e9ef; font-size:14px;">
+                                                <div style="font-weight:600;">Attachment {{ $idx + 1 }}</div>
+                                                <div style="color:#8f9bad; font-size:12px;">{{ $mime }} @if($sizeKB) • {{ $sizeKB }} @endif</div>
+                                            </div>
+                                            <a href="{{ $att['url'] }}" style="white-space:nowrap; background:#1f2537; color:#e6e9ef; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px 12px; text-decoration:none; font-weight:600;">Download</a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">Links expire in 10 minutes. Files will be permanently deleted then.</div>
                             </div>
                             @endif
                             <div style="display:flex; gap:10px; margin-top: 12px;">

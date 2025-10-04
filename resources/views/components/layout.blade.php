@@ -87,7 +87,7 @@
         
         <div class="content d-lg-flex align-items-end flex-wrap">
           <!-- para-3 -->
-          <p class="para-3">this site is built to solve a personal problem that I have, feel free to use it fairly<p>
+          <p class="para-3">this site is built to solve a personal problem, feel free to use it fairly<p>
           <!-- sign -->
           <div class="signature ml-auto mt-lg-0 mt-1">
             <p class="para-3">Developed by <a href="https://princewilldev.com/" target="_blank">Princewill dev</a></p>

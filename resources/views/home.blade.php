@@ -11,6 +11,16 @@
                     <div class="form-container" id="form-container" style="background: #0f1222; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); padding: 22px; backdrop-filter: blur(6px);">
                         <form action="/save" method="POST" class="header-form mx-auto" id="header-form" enctype="multipart/form-data">
                             @csrf
+                            @if ($errors->any())
+                            <div style="padding:8px; background:#4b1b1b; border:1px solid rgba(255,255,255,0.12); color:#f2dede; border-radius:6px; margin-bottom:8px;">
+                                <div style="font-weight:700; margin-bottom:4px;">There were some problems with your submission:</div>
+                                <ul style="margin:0 0 0 16px; padding:0;">
+                                    @foreach ($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                            @endif
                             @if(session('saved') && session('code'))
                             <div
                                 style="padding: 8px; background: green; border-radius: 4px; color: #ffffff; margin-bottom: 8px;">
@@ -27,13 +37,13 @@
                             <div class="inputs">
                                 <textarea name="writeup" id="" cols="35" rows="8" class="glassy form-control" required
                                     style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 12px;"
-                                    placeholder="type something"></textarea>
+                                    placeholder="type something">{{ old('writeup') }}</textarea>
                             </div>
                             <div class="inputs" style="margin-top: 10px;">
-                                <label for="image" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional image</label>
-                                <input type="file" name="image" id="image" accept="image/*" class="form-control"
+                                <label for="files" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional attachments</label>
+                                <input type="file" name="files[]" id="files" accept="image/*,application/pdf,video/mp4" class="form-control" multiple
                                     style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
-                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">Max 10MB. JPG, PNG, GIF, etc.</div>
+                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">Up to 100MB per file. Images, PDF, and MP4 supported.</div>
                             </div>
                             <button type="submit"
                                 class="w-100 font-500 mb-2 mt-2"
