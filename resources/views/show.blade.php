@@ -33,7 +33,7 @@
                                         </li>
                                     @endforeach
                                 </ul>
-                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">Links expire in 10 minutes. Files will be permanently deleted then.</div>
+                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">Download links expire in 10 minutes. PDFs, MP4s, and ZIPs will be deleted 5 minutes after viewing. This note and images are already deleted.</div>
                             </div>
                             @endif
                             <div style="display:flex; gap:10px; margin-top: 12px;">

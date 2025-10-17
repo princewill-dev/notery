@@ -9,7 +9,7 @@ class SaveImage extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['save_id', 'image', 'image_mime', 'path', 'size'];
+    protected $fillable = ['save_id', 'image', 'image_mime', 'path', 'size', 'is_encrypted'];
 
     public function parentSave()
     {

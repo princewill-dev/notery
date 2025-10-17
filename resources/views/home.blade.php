@@ -40,10 +40,16 @@
                                     placeholder="type something">{{ old('writeup') }}</textarea>
                             </div>
                             <div class="inputs" style="margin-top: 10px;">
-                                <label for="files" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional attachments</label>
-                                <input type="file" name="files[]" id="files" accept="image/*,application/pdf,video/mp4" class="form-control" multiple
+                                <label for="images" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional images (encrypted)</label>
+                                <input type="file" name="images[]" id="images" accept="image/*" class="form-control" multiple
                                     style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
-                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">Up to 100MB per file. Images, PDF, and MP4 supported.</div>
+                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">Images only. 100MB total for all images. Auto-deleted on viewing.</div>
+                            </div>
+                            <div class="inputs" style="margin-top: 10px;">
+                                <label for="files" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional files (not encrypted)</label>
+                                <input type="file" name="files[]" id="files" accept=".pdf,.mp4,.zip" class="form-control" multiple
+                                    style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
+                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">PDF (200MB), MP4 (500MB), ZIP (500MB). Deleted 5 minutes after viewing.</div>
                             </div>
                             <button type="submit"
                                 class="w-100 font-500 mb-2 mt-2"
