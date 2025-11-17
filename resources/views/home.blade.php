@@ -50,12 +50,12 @@
                                     </select>
                                 </div>
                                 <div id="attachment-file-wrapper" style="flex:1; min-width:220px; display:none;">
-                                    <label for="attachment" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional file</label>
+                                    <label for="attachment" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Uploaded files are auto deleted after 30 mins</label>
                                     <input type="file" name="attachment[]" id="attachment" multiple class="form-control"
                                         style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
                                 </div>
                             </div>
-                            <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">1 file only. Stored unencrypted and removed 5 minutes after viewing.</div>
+                            
                             <button type="submit"
                                 class="w-100 font-500 mb-2 mt-2"
                                 style="background: linear-gradient(135deg,#6a5af9,#00c2ff); color:#0b0f1a; border:none; border-radius:10px; padding: 12px 16px; font-weight: 700; letter-spacing: .2px; box-shadow: 0 6px 18px rgba(0,194,255,0.25);">Save note</button>

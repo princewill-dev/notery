@@ -66,8 +66,7 @@ class DeleteSaveJob implements ShouldQueue
             $img->delete();
         }
 
-        $save->delete();
-        $log("SAVE_RECORD_DELETED save_id={$this->saveId}");
+        $log("SAVE_RECORD_RETAINED save_id={$this->saveId}");
 
         $log("DONE DeleteSaveJob save_id={$this->saveId} attachments_deleted={$deleted} errors={$errors}");
     }
