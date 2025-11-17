@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Jobs\DeleteSaveJob;
 
@@ -44,51 +45,26 @@ class SaveController extends Controller
             $existingCode = Save::where('code', $hashedCode)->first();
         } while ($existingCode);
 
-        // Validate the submitted data: write-up required, files optional
-        // Separate rules: images (encrypted, 100MB total), PDF (200MB), MP4/ZIP (500MB)
+        // Validate the submitted data: write-up required, single optional attachment
         try {
-            $validateData = $request->validate([
+            $validator = Validator::make($request->all(), [
                 'writeup' => 'required|string',
-                'images' => 'nullable|array',
-                'images.*' => 'image|max:102400', // 100MB per image (collective checked below)
-                'files' => 'nullable|array',
-                'files.*' => 'file|mimes:pdf,mp4,zip|max:512000', // 500MB max
+                'attachment_type' => 'nullable|in:image,pdf,mp4|required_with:attachment',
+                'attachment' => 'nullable|array|required_with:attachment_type',
+                'attachment.*' => 'file',
             ]);
-            
-            // Validate collective image size (100MB total)
-            if ($request->hasFile('images')) {
-                $totalImageSize = 0;
-                foreach ($request->file('images') as $img) {
-                    if ($img && $img->isValid()) {
-                        $totalImageSize += $img->getSize();
-                    }
-                }
-                if ($totalImageSize > 100 * 1024 * 1024) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'images' => 'The total size of all images must not exceed 100MB.'
-                    ]);
-                }
-            }
-            
-            // Validate individual file size limits by type
-            if ($request->hasFile('files')) {
-                foreach ($request->file('files') as $idx => $file) {
-                    if ($file && $file->isValid()) {
-                        $mime = $file->getMimeType();
-                        $sizeMB = $file->getSize() / (1024 * 1024);
-                        if ($mime === 'application/pdf' && $sizeMB > 200) {
-                            throw \Illuminate\Validation\ValidationException::withMessages([
-                                "files.{$idx}" => 'PDF files must not exceed 200MB.'
-                            ]);
-                        }
-                        if (in_array($mime, ['video/mp4', 'application/zip']) && $sizeMB > 500) {
-                            throw \Illuminate\Validation\ValidationException::withMessages([
-                                "files.{$idx}" => 'MP4 and ZIP files must not exceed 500MB.'
-                            ]);
-                        }
-                    }
-                }
-            }
+
+            $validator->sometimes('attachment.*', 'image|max:102400', function ($input) {
+                return $input->attachment_type === 'image';
+            });
+            $validator->sometimes('attachment.*', 'mimes:pdf|max:204800', function ($input) {
+                return $input->attachment_type === 'pdf';
+            });
+            $validator->sometimes('attachment.*', 'mimes:mp4|max:512000', function ($input) {
+                return $input->attachment_type === 'mp4';
+            });
+
+            $validateData = $validator->validate();
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::warning('Validation failed on save', [
                 'errors' => $e->errors(),
@@ -105,37 +81,16 @@ class SaveController extends Controller
         // Save the note
         $contentdata->save();
 
-        // Save encrypted images (text+images are encrypted)
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $imageFile) {
-                if ($imageFile && $imageFile->isValid()) {
-                    $mime = $imageFile->getMimeType();
-                    $raw = file_get_contents($imageFile->getRealPath());
-                    $encrypted = Crypt::encryptString($raw);
-                    $path = 'notery/' . Str::uuid()->toString() . '.enc';
-                    Storage::put($path, $encrypted);
+        if ($request->hasFile('attachment')) {
+            foreach ($request->file('attachment') as $attachment) {
+                if ($attachment && $attachment->isValid()) {
+                    $mime = $attachment->getMimeType();
+                    $filename = Str::uuid()->toString() . '.' . $attachment->getClientOriginalExtension();
+                    $path = $attachment->storeAs('notery', $filename);
                     $contentdata->images()->create([
                         'path' => $path,
                         'image_mime' => $mime,
-                        'size' => $imageFile->getSize(),
-                        'is_encrypted' => true,
-                    ]);
-                }
-            }
-        }
-        
-        // Save unencrypted files (PDF, MP4, ZIP) using streaming to avoid memory issues
-        if ($request->hasFile('files')) {
-            foreach ($request->file('files') as $file) {
-                if ($file && $file->isValid()) {
-                    $mime = $file->getMimeType();
-                    $filename = Str::uuid()->toString() . '.' . $file->getClientOriginalExtension();
-                    // Use storeAs for streaming large files without loading into memory
-                    $path = $file->storeAs('notery', $filename);
-                    $contentdata->images()->create([
-                        'path' => $path,
-                        'image_mime' => $mime,
-                        'size' => $file->getSize(),
+                        'size' => $attachment->getSize(),
                         'is_encrypted' => false,
                     ]);
                 }

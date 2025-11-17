@@ -39,22 +39,48 @@
                                     style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 12px;"
                                     placeholder="type something">{{ old('writeup') }}</textarea>
                             </div>
-                            <div class="inputs" style="margin-top: 10px;">
-                                <label for="images" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional images (encrypted)</label>
-                                <input type="file" name="images[]" id="images" accept="image/*" class="form-control" multiple
-                                    style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
-                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">Images only. 100MB total for all images. Auto-deleted on viewing.</div>
+                            <div class="inputs" style="margin-top: 10px; display:flex; gap:10px; flex-wrap:wrap;">
+                                <div style="flex:1; min-width:220px;">
+                                    <label for="attachment_type" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Attachment type</label>
+                                    <select name="attachment_type" id="attachment_type" class="form-control" style="color: #fff; width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); padding: 8px;">
+                                        <option style="color: #000;" value="" {{ old('attachment_type') === '' ? 'selected' : '' }}>None</option>
+                                        <option style="color: #000;" value="image" {{ old('attachment_type') === 'image' ? 'selected' : '' }}>Image (max 100MB)</option>
+                                        <option style="color: #000;" value="pdf" {{ old('attachment_type') === 'pdf' ? 'selected' : '' }}>PDF (max 200MB)</option>
+                                        <option style="color: #000;" value="mp4" {{ old('attachment_type') === 'mp4' ? 'selected' : '' }}>MP4 (max 500MB)</option>
+                                    </select>
+                                </div>
+                                <div id="attachment-file-wrapper" style="flex:1; min-width:220px; display:none;">
+                                    <label for="attachment" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional file</label>
+                                    <input type="file" name="attachment[]" id="attachment" multiple class="form-control"
+                                        style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
+                                </div>
                             </div>
-                            <div class="inputs" style="margin-top: 10px;">
-                                <label for="files" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Optional files (not encrypted)</label>
-                                <input type="file" name="files[]" id="files" accept=".pdf,.mp4,.zip" class="form-control" multiple
-                                    style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
-                                <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">PDF (200MB), MP4 (500MB), ZIP (500MB). Deleted 5 minutes after viewing.</div>
-                            </div>
+                            <div style="color:#8f9bad; font-size: 12px; margin-top: 6px;">1 file only. Stored unencrypted and removed 5 minutes after viewing.</div>
                             <button type="submit"
                                 class="w-100 font-500 mb-2 mt-2"
                                 style="background: linear-gradient(135deg,#6a5af9,#00c2ff); color:#0b0f1a; border:none; border-radius:10px; padding: 12px 16px; font-weight: 700; letter-spacing: .2px; box-shadow: 0 6px 18px rgba(0,194,255,0.25);">Save note</button>
                         </form>
+                        <script>
+                            (function () {
+                                const typeSelect = document.getElementById('attachment_type');
+                                const fileWrapper = document.getElementById('attachment-file-wrapper');
+
+                                function toggleAttachmentVisibility() {
+                                    if (!typeSelect || !fileWrapper) {
+                                        return;
+                                    }
+                                    fileWrapper.style.display = typeSelect.value ? 'block' : 'none';
+                                }
+
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    toggleAttachmentVisibility();
+                                });
+
+                                if (typeSelect) {
+                                    typeSelect.addEventListener('change', toggleAttachmentVisibility);
+                                }
+                            })();
+                        </script>
                         <div class="hr position-relative" style="margin: 14px 0; text-align:center;">
                             <span style="display:inline-block; color:#8f9bad; font-size:12px; letter-spacing:.4px; text-transform:uppercase;">Or find a note</span>
                         </div>

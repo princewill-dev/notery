@@ -38,19 +38,15 @@ class DeleteSaveJob implements ShouldQueue
 
         $log("START DeleteSaveJob save_id={$this->saveId}");
 
-        // Only delete unencrypted files (encrypted content is deleted immediately on view)
-        $unencryptedImages = \App\Models\SaveImage::where('save_id', $this->saveId)
-            ->where('is_encrypted', false)
-            ->get();
-        
-        if ($unencryptedImages->isEmpty()) {
-            $log("SKIP save_id={$this->saveId} no unencrypted files found");
+        $save = Save::with('images')->find($this->saveId);
+        if (!$save) {
+            $log("SKIP save_id={$this->saveId} target already removed");
             return;
         }
 
         $deleted = 0;
         $errors = 0;
-        foreach ($unencryptedImages as $img) {
+        foreach ($save->images as $img) {
             if (!empty($img->path) && Storage::exists($img->path)) {
                 try {
                     if (Storage::delete($img->path)) {
@@ -64,17 +60,15 @@ class DeleteSaveJob implements ShouldQueue
                     $errors++;
                     $log("FILE_DELETE_EXCEPTION save_id={$this->saveId} path={$img->path} error=" . $e->getMessage());
                 }
+            } else {
+                $log("FILE_MISSING save_id={$this->saveId} path=" . ($img->path ?? '')); 
             }
             $img->delete();
         }
 
-        // Delete the Save record after unencrypted files are removed
-        $save = Save::find($this->saveId);
-        if ($save) {
-            $save->delete();
-            $log("SAVE_RECORD_DELETED save_id={$this->saveId}");
-        }
+        $save->delete();
+        $log("SAVE_RECORD_DELETED save_id={$this->saveId}");
 
-        $log("DONE DeleteSaveJob save_id={$this->saveId} unencrypted_files_deleted={$deleted} errors={$errors}");
+        $log("DONE DeleteSaveJob save_id={$this->saveId} attachments_deleted={$deleted} errors={$errors}");
     }
 }
