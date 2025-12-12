@@ -50,7 +50,7 @@
                                     </select>
                                 </div>
                                 <div id="attachment-file-wrapper" style="flex:1; min-width:220px; display:none;">
-                                    <label for="attachment" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Uploaded files are auto deleted after 30 mins</label>
+                                    <label for="attachment" style="display:block; color:#aab3c0; font-size: 13px; margin-bottom:6px;">Upload files</label>
                                     <input type="file" name="attachment[]" id="attachment" multiple class="form-control"
                                         style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
                                 </div>

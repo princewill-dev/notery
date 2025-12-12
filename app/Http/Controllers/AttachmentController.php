@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\Mime\MimeTypes;
 
 class AttachmentController extends Controller
 {
@@ -18,17 +17,13 @@ class AttachmentController extends Controller
             $img = SaveImage::findOrFail($id);
 
         $mime = $img->image_mime ?: 'application/octet-stream';
-        // Determine a suitable file extension from MIME
+        // Determine file extension from stored path so we preserve the original type
         $ext = 'bin';
-        try {
-            if (class_exists(\Symfony\Component\Mime\MimeTypes::class)) {
-                $exts = MimeTypes::getDefault()->getExtensions($mime);
-                if (!empty($exts)) {
-                    $ext = $exts[0];
-                }
+        if (!empty($img->path)) {
+            $pathExt = pathinfo($img->path, PATHINFO_EXTENSION);
+            if (is_string($pathExt) && $pathExt !== '') {
+                $ext = strtolower($pathExt);
             }
-        } catch (\Throwable $e) {
-            // ignore
         }
         if ($ext === 'bin') {
             $fallback = [

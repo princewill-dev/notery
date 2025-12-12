@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use App\Jobs\DeleteSaveJob;
 
 class SaveController extends Controller
 {
@@ -150,26 +149,9 @@ class SaveController extends Controller
                     ];
                 }
 
-                // Delete encrypted content (text + images) immediately
-                $hasUnencryptedFiles = $encryptedData->images()->where('is_encrypted', false)->exists();
-                
-                foreach ($encryptedData->images as $img) {
-                    if ($img->is_encrypted && !empty($img->path) && Storage::exists($img->path)) {
-                        Storage::delete($img->path);
-                    }
-                }
-                // Delete the encrypted image records
-                $encryptedData->images()->where('is_encrypted', true)->delete();
-                
-                if ($hasUnencryptedFiles) {
-                    // Keep Save record but clear writeup, schedule deletion for 5 minutes
-                    $encryptedData->writeup = '';
-                    $encryptedData->save();
-                    DeleteSaveJob::dispatch($encryptedData->id)->delay(now()->addMinutes(5));
-                } else {
-                    // No unencrypted files, delete everything immediately
-                    $encryptedData->delete();
-                }
+                // Keep all attachments permanently stored, only delete the encrypted writeup
+                $encryptedData->writeup = '';
+                $encryptedData->save();
                 
                 // Increment the decodes counter
                 Stats::incrementDecodes();

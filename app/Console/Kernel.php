@@ -12,8 +12,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Clean up attachments from saves older than 24 hours, runs every hour
-        $schedule->command('saves:cleanup --hours=24')->hourly();
+        //
     }
 
     /**
