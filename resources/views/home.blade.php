@@ -1,7 +1,7 @@
 <x-layout>
 
 
-    <header class="main-header">
+    <header class="main-header" id="home-main-header">
         <form action="/save" method="POST" class="header-form mx-auto" id="header-form" enctype="multipart/form-data">
             @csrf
             @if ($errors->any())
@@ -74,6 +74,14 @@
             <div class="form-comment mt-2" style="color:#8f9bad; font-size: 12px;">Create a quick note and get a 4‑digit pin</div>
 
         </form>
+
+        <style>
+            @media only screen and (max-width: 767px) {
+                #home-main-header {
+                    padding: 24px 0 40px !important;
+                }
+            }
+        </style>
 
         <div id="findNoteModal" aria-hidden="true" style="display:none; position:fixed; inset:0; z-index:9999;">
             <div id="findNoteModalBackdrop" style="position:absolute; inset:0; background: rgba(0,0,0,0.6);"></div>
