@@ -44,13 +44,14 @@ class SaveController extends Controller
             $existingCode = Save::where('code', $hashedCode)->first();
         } while ($existingCode);
 
-        // Validate the submitted data: write-up required, single optional attachment
+        // Validate the submitted data: write-up required, optional attachment and optional max_views
         try {
             $validator = Validator::make($request->all(), [
                 'writeup' => 'required|string',
                 'attachment_type' => 'nullable|in:image,pdf,mp4|required_with:attachment',
                 'attachment' => 'nullable|array|required_with:attachment_type',
                 'attachment.*' => 'file',
+                'max_views' => 'nullable|integer|min:1|max:100',
             ]);
 
             $validator->sometimes('attachment.*', 'image|max:102400', function ($input) {
@@ -77,6 +78,8 @@ class SaveController extends Controller
         $contentdata = new Save;
         $contentdata->writeup = $encryptedContent;
         $contentdata->code = $hashedCode; // Store the hashed code
+        $contentdata->max_views = $validateData['max_views'] ?? null;
+        $contentdata->views_count = 0;
         // Save the note
         $contentdata->save();
 
@@ -149,14 +152,36 @@ class SaveController extends Controller
                     ];
                 }
 
-                // Keep all attachments permanently stored, only delete the encrypted writeup
-                $encryptedData->writeup = '';
-                $encryptedData->save();
-                
-                // Increment the decodes counter
+                // Increment view counter and enforce max views deletion
+                $encryptedData->views_count = ($encryptedData->views_count ?? 0) + 1;
+                $maxViews = $encryptedData->max_views; // null means no auto-delete
+
+                $remainingViews = null;
+                if ($maxViews !== null) {
+                    $remainingViews = max(0, (int) $maxViews - (int) $encryptedData->views_count);
+                }
+
+                // Increment the decodes counter for every successful view
                 Stats::incrementDecodes();
-                
-                return view('show', compact('decryptedText', 'attachments'));
+
+                // Render the note before potentially deleting it
+                $response = view('show', compact('decryptedText', 'attachments', 'remainingViews', 'maxViews'));
+
+                if ($maxViews !== null && $encryptedData->views_count >= $maxViews) {
+                    // Delete attachments from storage
+                    foreach ($encryptedData->images as $img) {
+                        if (!empty($img->path) && Storage::exists($img->path)) {
+                            Storage::delete($img->path);
+                        }
+                        $img->delete();
+                    }
+                    // Delete the save record itself
+                    $encryptedData->delete();
+                } else {
+                    $encryptedData->save();
+                }
+
+                return $response;
             } catch (\Exception $e) {
                 $errorMessage = 'Invalid code';
                 $request->session()->flash('errorMessage', $errorMessage);

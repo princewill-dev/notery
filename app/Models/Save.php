@@ -9,7 +9,7 @@ class Save extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['code', 'writeup'];
+    protected $fillable = ['code', 'writeup', 'max_views', 'views_count'];
 
     public function images()
     {
