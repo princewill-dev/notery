@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    container_name: notery_app
+    restart: always
+    volumes:
+      - ./:/var/www/html
+    networks:
+      - web_network
+    env_file:
+      - .env
+
+networks:
+  web_network:
+    external: true
