@@ -4,11 +4,12 @@ FROM php:8.3-apache
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libzip-dev \
+    libpq-dev \
     zip \
     unzip \
     git \
     curl \
-    && docker-php-ext-install pdo_mysql bcmath gd zip
+    && docker-php-ext-install pdo_mysql pdo_pgsql bcmath gd zip
 
 # 2. Apache Configuration: Point DocumentRoot to /public
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
