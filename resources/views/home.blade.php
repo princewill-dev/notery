@@ -62,7 +62,7 @@
                     style="width:100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background-color: rgba(255,255,255,0.04); color:#e6e9ef; padding: 8px;" />
             </div>
             
-            <button type="submit" class="w-100 font-500 mb-2 mt-2" style="background: linear-gradient(135deg,#6a5af9,#00c2ff); color:#0b0f1a; border:none; border-radius:10px; padding: 12px 16px; font-weight: 700; letter-spacing: .2px; box-shadow: 0 6px 18px rgba(0,194,255,0.25);">Save note</button>
+            <button type="submit" id="saveButton" class="w-100 font-500 mb-2 mt-2" style="background: linear-gradient(135deg,#6a5af9,#00c2ff); color:#0b0f1a; border:none; border-radius:10px; padding: 12px 16px; font-weight: 700; letter-spacing: .2px; box-shadow: 0 6px 18px rgba(0,194,255,0.25);">Save note</button>
 
 
 
@@ -107,6 +107,8 @@
             (function () {
                 const typeSelect = document.getElementById('attachment_type');
                 const fileWrapper = document.getElementById('attachment-file-wrapper');
+                const saveButton = document.getElementById('saveButton');
+                const headerForm = document.getElementById('header-form');
 
                 const openFindModal = document.getElementById('openFindModal');
                 const modal = document.getElementById('findNoteModal');
@@ -140,6 +142,15 @@
 
                 if (typeSelect) {
                     typeSelect.addEventListener('change', toggleAttachmentVisibility);
+                }
+
+                // Handle form submission - disable button and change text
+                if (headerForm && saveButton) {
+                    headerForm.addEventListener('submit', function () {
+                        saveButton.disabled = true;
+                        saveButton.textContent = 'Saving...';
+                        saveButton.style.opacity = '0.7';
+                    });
                 }
 
                 openFindModal?.addEventListener('click', showFindModal);
