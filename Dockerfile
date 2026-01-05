@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     git \
     curl \
+    cron \
     && docker-php-ext-install pdo_mysql pdo_pgsql bcmath gd zip
 
 # 2. Apache Configuration: Point DocumentRoot to /public
@@ -27,5 +28,15 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 COPY php/conf.d/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 
-# 4. Set working directory
+# 4. Set up Laravel scheduler with cron
+RUN echo "* * * * * cd /var/www/html && php artisan schedule:run >> /dev/null 2>&1" | crontab -
+
+# 5. Create startup script to run both Apache and cron
+RUN echo '#!/bin/bash\n\
+service cron start\n\
+apache2-foreground' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
+
+# 6. Set working directory
 WORKDIR /var/www/html
+
+CMD ["/usr/local/bin/start.sh"]

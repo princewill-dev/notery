@@ -78,7 +78,7 @@ class SaveController extends Controller
         $contentdata = new Save;
         $contentdata->writeup = $encryptedContent;
         $contentdata->code = $hashedCode; // Store the hashed code
-        $contentdata->max_views = $validateData['max_views'] ?? null;
+        $contentdata->max_views = $validateData['max_views'] ?? 1;
         $contentdata->views_count = 0;
         // Save the note
         $contentdata->save();
@@ -123,12 +123,56 @@ class SaveController extends Controller
         $encryptedData = Save::where('code', $hashedCode)->with('images')->first();
 
         if ($encryptedData) {
-            // If the write-up exists, display it
-            try {
-                $decryptedText = Crypt::decryptString($encryptedData->writeup);
+            // Use database transaction and locking to prevent race conditions
+            return \DB::transaction(function () use ($encryptedData) {
+                // Lock the row for update to prevent concurrent access
+                $lockedData = Save::where('id', $encryptedData->id)
+                    ->lockForUpdate()
+                    ->with('images')
+                    ->first();
+                
+                // Double-check it still exists (could have been deleted by another request)
+                if (!$lockedData) {
+                    $errorMessage = 'Invalid code';
+                    session()->flash('errorMessage', $errorMessage);
+                    return view('error', compact('errorMessage'));
+                }
+
+                $maxViews = $lockedData->max_views;
+                $currentViews = $lockedData->views_count ?? 0;
+
+                // Check if already exceeded BEFORE incrementing
+                if ($maxViews !== null && $currentViews >= $maxViews) {
+                    // Already at or over limit - delete and show error
+                    foreach ($lockedData->images as $img) {
+                        if (!empty($img->path) && Storage::exists($img->path)) {
+                            Storage::delete($img->path);
+                        }
+                        $img->delete();
+                    }
+                    $lockedData->delete();
+                    
+                    $errorMessage = 'This note has reached its view limit and is no longer available';
+                    session()->flash('errorMessage', $errorMessage);
+                    return view('error', compact('errorMessage'));
+                }
+
+                // Atomically increment the view count in the database
+                Save::where('id', $lockedData->id)->increment('views_count');
+                $newViewCount = $currentViews + 1;
+
+                // Decrypt and prepare the content
+                try {
+                    $decryptedText = Crypt::decryptString($lockedData->writeup);
+                } catch (\Exception $e) {
+                    $errorMessage = 'Invalid code';
+                    session()->flash('errorMessage', $errorMessage);
+                    return view('error', compact('errorMessage'));
+                }
+
                 // Prepare attachments as signed download URLs (from DB)
                 $attachments = [];
-                foreach ($encryptedData->images as $img) {
+                foreach ($lockedData->images as $img) {
                     $url = URL::temporarySignedRoute('attachments.download', now()->addMinutes(10), ['id' => $img->id]);
                     $attachments[] = [
                         'url' => $url,
@@ -136,29 +180,26 @@ class SaveController extends Controller
                         'size' => $img->size,
                     ];
                 }
+                
                 // Legacy single-image fallback: make a SaveImage row so we can stream via controller
-                if (empty($attachments) && !empty($encryptedData->image) && !empty($encryptedData->image_mime)) {
-                    $legacy = $encryptedData->images()->create([
-                        'image' => $encryptedData->image, // keep existing encrypted blob
-                        'image_mime' => $encryptedData->image_mime,
+                if (empty($attachments) && !empty($lockedData->image) && !empty($lockedData->image_mime)) {
+                    $legacy = $lockedData->images()->create([
+                        'image' => $lockedData->image, // keep existing encrypted blob
+                        'image_mime' => $lockedData->image_mime,
                         'path' => null,
                         'size' => null,
                     ]);
                     $url = URL::temporarySignedRoute('attachments.download', now()->addMinutes(10), ['id' => $legacy->id]);
                     $attachments[] = [
                         'url' => $url,
-                        'mime' => $encryptedData->image_mime,
+                        'mime' => $lockedData->image_mime,
                         'size' => null,
                     ];
                 }
 
-                // Increment view counter and enforce max views deletion
-                $encryptedData->views_count = ($encryptedData->views_count ?? 0) + 1;
-                $maxViews = $encryptedData->max_views; // null means no auto-delete
-
                 $remainingViews = null;
                 if ($maxViews !== null) {
-                    $remainingViews = max(0, (int) $maxViews - (int) $encryptedData->views_count);
+                    $remainingViews = max(0, (int) $maxViews - (int) $newViewCount);
                 }
 
                 // Increment the decodes counter for every successful view
@@ -167,26 +208,21 @@ class SaveController extends Controller
                 // Render the note before potentially deleting it
                 $response = view('show', compact('decryptedText', 'attachments', 'remainingViews', 'maxViews'));
 
-                if ($maxViews !== null && $encryptedData->views_count >= $maxViews) {
+                // Delete if this was the final view
+                if ($maxViews !== null && $newViewCount >= $maxViews) {
                     // Delete attachments from storage
-                    foreach ($encryptedData->images as $img) {
+                    foreach ($lockedData->images as $img) {
                         if (!empty($img->path) && Storage::exists($img->path)) {
                             Storage::delete($img->path);
                         }
                         $img->delete();
                     }
                     // Delete the save record itself
-                    $encryptedData->delete();
-                } else {
-                    $encryptedData->save();
+                    $lockedData->delete();
                 }
 
                 return $response;
-            } catch (\Exception $e) {
-                $errorMessage = 'Invalid code';
-                $request->session()->flash('errorMessage', $errorMessage);
-                return view('error', compact('errorMessage'));
-            }
+            });
         } else {
             $errorMessage = 'Invalid code';
             $request->session()->flash('errorMessage', $errorMessage);
