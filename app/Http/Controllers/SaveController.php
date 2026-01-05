@@ -48,7 +48,7 @@ class SaveController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'writeup' => 'required|string',
-                'attachment_type' => 'nullable|in:image,pdf,mp4|required_with:attachment',
+                'attachment_type' => 'nullable|in:image,pdf,mp4,zip|required_with:attachment',
                 'attachment' => 'nullable|array|required_with:attachment_type',
                 'attachment.*' => 'file',
                 'max_views' => 'nullable|integer|min:1|max:100',
@@ -62,6 +62,9 @@ class SaveController extends Controller
             });
             $validator->sometimes('attachment.*', 'mimes:mp4|max:512000', function ($input) {
                 return $input->attachment_type === 'mp4';
+            });
+            $validator->sometimes('attachment.*', 'mimes:zip|max:512000', function ($input) {
+                return $input->attachment_type === 'zip';
             });
 
             $validateData = $validator->validate();

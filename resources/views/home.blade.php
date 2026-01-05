@@ -40,6 +40,7 @@
                         <option style="color: #000;" value="image" {{ old('attachment_type') === 'image' ? 'selected' : '' }}>Image (max 100MB)</option>
                         <option style="color: #000;" value="pdf" {{ old('attachment_type') === 'pdf' ? 'selected' : '' }}>PDF (max 200MB)</option>
                         <option style="color: #000;" value="mp4" {{ old('attachment_type') === 'mp4' ? 'selected' : '' }}>MP4 (max 500MB)</option>
+                        <option style="color: #000;" value="zip" {{ old('attachment_type') === 'zip' ? 'selected' : '' }}>ZIP (max 500MB)</option>
                     </select>
                 </div>
                 <div id="attachment-file-wrapper" style="flex:1; min-width:220px; display:none;">
