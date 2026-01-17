@@ -14,7 +14,14 @@ class AttachmentController extends Controller
     public function download(Request $request, int $id)
     {
         try {
-            $img = SaveImage::findOrFail($id);
+            $img = SaveImage::find($id);
+            
+            // Handle case where attachment was deleted (view limit reached or expired)
+            if (!$img) {
+                return response()->view('error', [
+                    'errorMessage' => 'This attachment is no longer available. It may have expired or reached its view limit.'
+                ], 404);
+            }
 
         $mime = $img->image_mime ?: 'application/octet-stream';
         // Determine file extension from stored path so we preserve the original type

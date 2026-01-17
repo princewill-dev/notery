@@ -33,6 +33,8 @@ RUN echo "* * * * * cd /var/www/html && php artisan schedule:run >> /dev/null 2>
 
 # 5. Create startup script to run both Apache and cron
 RUN echo '#!/bin/bash\n\
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache\n\
+chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache\n\
 service cron start\n\
 apache2-foreground' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
 
