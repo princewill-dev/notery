@@ -1,0 +1,234 @@
+/* ═══════════════════════════════════════════
+   Notery — Modern Grayscale Design System
+   ═══════════════════════════════════════════ */
+
+:root {
+  --bg:             #f8f9fa;
+  --surface:        #ffffff;
+  --border:         #e5e7eb;
+  --border-hover:   #d1d5db;
+  --border-focus:   #1a1a1a;
+  --text:           #111111;
+  --text-secondary: #6b7280;
+  --text-muted:     #9ca3af;
+  --accent:         #1a1a1a;
+  --accent-hover:   #333333;
+  --accent-text:    #ffffff;
+  --danger:         #dc2626;
+  --danger-bg:      #fef2f2;
+  --danger-border:  #fecaca;
+  --success:        #16a34a;
+  --success-bg:     #f0fdf4;
+  --success-border: #bbf7d0;
+  --radius:         14px;
+  --radius-sm:      10px;
+  --ring:           0 0 0 3px rgba(0,0,0,0.07);
+}
+
+*, *::before, *::after {
+  margin: 0; padding: 0; box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter',
+               Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Layout ────────────────────────────── */
+.notery-shell { flex: 1; display: flex; flex-direction: column; }
+.notery-page { flex: 1; display: flex; flex-direction: column; align-items: center;
+               justify-content: center; padding: 48px 24px; }
+.notery-container { width: 100%; max-width: 680px; }
+
+/* ── Brand ─────────────────────────────── */
+.notery-brand { text-align: center; margin-bottom: 32px; }
+.notery-logo { font-size: 26px; font-weight: 700; letter-spacing: -0.4px;
+               color: var(--text); line-height: 1.2; }
+.notery-subtitle { font-size: 14px; color: var(--text-secondary); margin-top: 4px;
+                   font-weight: 400; }
+
+/* ── Card ──────────────────────────────── */
+.notery-card { background: var(--surface); border: 1px solid var(--border);
+               border-radius: var(--radius); padding: 32px; }
+
+/* ── Form ──────────────────────────────── */
+.notery-form { display: flex; flex-direction: column; gap: 20px; }
+
+/* ── Textarea ──────────────────────────── */
+.notery-textarea {
+  width: 100%; min-height: 220px; padding: 18px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 16px; line-height: 1.7;
+  color: var(--text); background: var(--surface);
+  resize: vertical; outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.notery-textarea:hover { border-color: var(--border-hover); }
+.notery-textarea:focus { border-color: var(--border-focus); box-shadow: var(--ring); }
+.notery-textarea::placeholder { color: var(--text-muted); }
+.notery-textarea[readonly] { background: var(--bg); cursor: default;
+  resize: none; min-height: 200px; max-height: 55vh; overflow-y: auto; }
+
+/* ── Input ─────────────────────────────── */
+.notery-input {
+  width: 100%; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px;
+  color: var(--text); background: var(--surface); outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.notery-input:hover { border-color: var(--border-hover); }
+.notery-input:focus { border-color: var(--border-focus); box-shadow: var(--ring); }
+.notery-input::placeholder { color: var(--text-muted); }
+
+/* ── Select ────────────────────────────── */
+.notery-select-wrap { position: relative; }
+.notery-select-wrap select {
+  width: 100%; padding: 12px 36px 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px;
+  color: var(--text); background: var(--surface);
+  outline: none; appearance: none; cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.notery-select-wrap select:hover { border-color: var(--border-hover); }
+.notery-select-wrap select:focus { border-color: var(--border-focus); box-shadow: var(--ring); }
+.notery-select-wrap::after {
+  content: ''; position: absolute; right: 14px; top: 50%;
+  transform: translateY(-50%); width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 5px solid var(--text-muted); pointer-events: none;
+}
+
+/* ── Label ─────────────────────────────── */
+.notery-label { display: block; font-size: 13px; font-weight: 600;
+  color: var(--text-secondary); margin-bottom: 6px; letter-spacing: 0.01em; }
+.notery-label-optional { font-weight: 400; color: var(--text-muted); }
+
+/* ── Buttons ───────────────────────────── */
+.notery-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 13px 24px; border: none; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 15px; font-weight: 600;
+  cursor: pointer; text-decoration: none; line-height: 1;
+  transition: background 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+.notery-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.notery-btn-primary { background: var(--accent); color: var(--accent-text); }
+.notery-btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.notery-btn-secondary { background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); }
+.notery-btn-secondary:hover { background: var(--bg); border-color: var(--border-hover); }
+.notery-btn-ghost { background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border); }
+.notery-btn-ghost:hover { background: var(--bg); color: var(--text);
+  border-color: var(--border-hover); }
+.notery-btn-block { width: 100%; }
+.notery-btn-sm { padding: 8px 16px; font-size: 13px; }
+
+/* ── Row / Col ─────────────────────────── */
+.notery-row { display: flex; gap: 12px; align-items: flex-end; }
+.notery-col { flex: 1; min-width: 0; }
+
+/* ── Alerts ────────────────────────────── */
+.notery-alert { padding: 14px 18px; border-radius: var(--radius-sm);
+  font-size: 14px; line-height: 1.55; }
+.notery-alert-error { background: var(--danger-bg); color: var(--danger);
+  border: 1px solid var(--danger-border); }
+.notery-alert-error ul { margin: 6px 0 0 18px; padding: 0; }
+.notery-alert-error li { margin-bottom: 2px; }
+.notery-alert-success { background: var(--success-bg); color: var(--success);
+  border: 1px solid var(--success-border); }
+.notery-alert-title { font-weight: 700; margin-bottom: 4px; }
+
+/* ── Code Badge ────────────────────────── */
+.notery-code { display: inline-block;
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 30px; font-weight: 700; letter-spacing: 6px;
+  color: var(--text); background: var(--bg);
+  padding: 12px 28px; border-radius: var(--radius-sm); user-select: all; }
+
+/* ── Button group ──────────────────────── */
+.notery-btn-group { display: flex; gap: 10px; }
+.notery-btn-group .notery-btn { flex: 1; }
+
+/* ── Divider ───────────────────────────── */
+.notery-divider { display: flex; align-items: center; gap: 14px;
+  color: var(--text-muted); font-size: 12px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.6px; }
+.notery-divider::before, .notery-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Attachment list ───────────────────── */
+.notery-attachment { display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 14px 16px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg); }
+.notery-attachment-info { min-width: 0; }
+.notery-attachment-name { font-size: 14px; font-weight: 600;
+  color: var(--text); word-break: break-word; }
+.notery-attachment-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── View counter ──────────────────────── */
+.notery-views { font-size: 13px; color: var(--text-secondary); text-align: center; }
+.notery-views strong { color: var(--text); font-weight: 700; }
+
+/* ── Hint text ─────────────────────────── */
+.notery-hint { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+/* ── Modal ─────────────────────────────── */
+.notery-modal-overlay { position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(0,0,0,0.35); backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px); }
+.notery-modal { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 28px; width: 100%; max-width: 400px;
+  box-shadow: 0 24px 72px rgba(0,0,0,0.12);
+  animation: notery-modal-in 0.2s ease; }
+@keyframes notery-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); } }
+.notery-modal-header { display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 20px; }
+.notery-modal-title { font-size: 17px; font-weight: 700; }
+
+/* ── Footer ────────────────────────────── */
+.notery-footer { text-align: center; padding: 20px;
+  font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+.notery-footer a { color: var(--text-secondary); text-decoration: none;
+  font-weight: 500; }
+.notery-footer a:hover { color: var(--text); text-decoration: underline; }
+
+/* ── Responsive ────────────────────────── */
+@media (max-width: 640px) {
+  .notery-page { padding: 32px 16px; }
+  .notery-card { padding: 24px 20px; border-radius: var(--radius-sm); }
+  .notery-textarea { min-height: 180px; font-size: 15px; padding: 14px; }
+  .notery-row { flex-direction: column; gap: 14px; }
+  .notery-logo { font-size: 22px; }
+  .notery-code { font-size: 24px; letter-spacing: 4px; padding: 10px 20px; }
+  .notery-modal { padding: 22px 18px; }
+}
+
+/* ── Utilities ─────────────────────────── */
+.notery-hidden { display: none !important; }
+.notery-text-center { text-align: center; }
+.notery-mb-2 { margin-bottom: 8px; }
+.notery-mb-3 { margin-bottom: 12px; }
+.notery-mb-4 { margin-bottom: 16px; }
+.notery-mt-2 { margin-top: 8px; }
+.notery-mt-3 { margin-top: 12px; }
+.notery-mt-4 { margin-top: 16px; }
+.notery-gap-2 { gap: 8px; }
+.notery-gap-3 { gap: 12px; }
