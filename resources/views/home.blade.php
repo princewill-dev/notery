@@ -27,23 +27,21 @@
         placeholder="Start typing your note..."
         required autofocus>{{ old('writeup') }}</textarea>
 
-      <div class="notery-row">
-        <div class="notery-col">
-          <label for="attachment_type" class="notery-label">Attachment type</label>
-          <div class="notery-select-wrap">
-            <select name="attachment_type" id="attachment_type">
-              <option value="" {{ old('attachment_type')===''?'selected':'' }}>None</option>
-              <option value="image" {{ old('attachment_type')==='image'?'selected':'' }}>Image (max 100 MB)</option>
-              <option value="pdf" {{ old('attachment_type')==='pdf'?'selected':'' }}>PDF (max 200 MB)</option>
-              <option value="mp4" {{ old('attachment_type')==='mp4'?'selected':'' }}>MP4 (max 500 MB)</option>
-              <option value="zip" {{ old('attachment_type')==='zip'?'selected':'' }}>ZIP (max 500 MB)</option>
-            </select>
-          </div>
+      <div>
+        <label for="attachment_type" class="notery-label">Attachment type</label>
+        <div class="notery-select-wrap">
+          <select name="attachment_type" id="attachment_type">
+            <option value="" {{ old('attachment_type')===''?'selected':'' }}>None</option>
+            <option value="image" {{ old('attachment_type')==='image'?'selected':'' }}>Image (max 100 MB)</option>
+            <option value="pdf" {{ old('attachment_type')==='pdf'?'selected':'' }}>PDF (max 200 MB)</option>
+            <option value="mp4" {{ old('attachment_type')==='mp4'?'selected':'' }}>MP4 (max 500 MB)</option>
+            <option value="zip" {{ old('attachment_type')==='zip'?'selected':'' }}>ZIP (max 500 MB)</option>
+          </select>
         </div>
-        <div class="notery-col" id="attachment-file-wrapper" style="display:none;">
-          <label for="attachment" class="notery-label">Choose files</label>
-          <input type="file" name="attachment[]" id="attachment" multiple class="notery-input" />
-        </div>
+      </div>
+      <div id="attachment-file-wrapper" style="display:none;">
+        <label for="attachment" class="notery-label">Choose files</label>
+        <input type="file" name="attachment[]" id="attachment" multiple class="notery-input" />
       </div>
 
       <div>
