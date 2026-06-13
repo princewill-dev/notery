@@ -8,13 +8,6 @@
     <p class="notery-subtitle">Save and retrieve notes anonymously with a 4‑digit code</p>
   </div>
 
-  @if(session('saved') && session('code'))
-    <div class="notery-alert notery-alert-success notery-mb-3">
-      Note saved — your code: <strong>{{ session('code') }}</strong>
-    </div>
-    <a href="/{{ session('code') }}" class="notery-btn notery-btn-primary notery-btn-block notery-mb-4">View saved note</a>
-  @endif
-
   @if ($errors->any())
     <div class="notery-alert notery-alert-error notery-mb-4">
       <div class="notery-alert-title">There were some problems:</div>
@@ -90,6 +83,25 @@
   </div>
 </div>
 
+{{-- Saved modal --}}
+@if(session('saved') && session('code'))
+<div id="savedModal" class="notery-modal-overlay">
+  <div id="savedModalBackdrop" style="position:absolute;inset:0;"></div>
+  <div class="notery-modal notery-text-center" style="position:relative;z-index:1;">
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">Note saved</h2>
+    <div class="notery-code" id="savedCode">{{ session('code') }}</div>
+    <button type="button" id="copyCodeBtn" class="notery-btn notery-btn-secondary notery-btn-sm notery-mt-2" style="display:inline-flex;align-items:center;gap:6px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy
+    </button>
+    <div class="notery-mt-4 notery-btn-group">
+      <a href="/{{ session('code') }}" class="notery-btn notery-btn-primary">View note</a>
+      <button type="button" id="closeSavedModal" class="notery-btn notery-btn-secondary">Save another</button>
+    </div>
+  </div>
+</div>
+@endif
+
 <script>
 (function () {
   var typeSelect  = document.getElementById('attachment_type');
@@ -102,6 +114,7 @@
   var closeBtn    = document.getElementById('closeFindModal');
   var findInput   = document.getElementById('find_code');
 
+  // --- Find modal ---
   function show() {
     modal.classList.remove('notery-hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -111,6 +124,52 @@
     modal.classList.add('notery-hidden');
     modal.setAttribute('aria-hidden', 'true');
   }
+
+  // --- Saved modal ---
+  var savedModal    = document.getElementById('savedModal');
+  var savedBackdrop = document.getElementById('savedModalBackdrop');
+  var closeSaved    = document.getElementById('closeSavedModal');
+  var copyCodeBtn   = document.getElementById('copyCodeBtn');
+  var savedCode     = document.getElementById('savedCode');
+
+  function closeSavedModal() {
+    if (!savedModal) return;
+    savedModal.remove();
+  }
+
+  if (copyCodeBtn && savedCode) {
+    copyCodeBtn.addEventListener('click', function() {
+      var code = savedCode.textContent.trim();
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(code);
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = code;
+          ta.style.position = 'fixed'; ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        copyCodeBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied';
+        copyCodeBtn.disabled = true;
+        setTimeout(function() {
+          copyCodeBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy';
+          copyCodeBtn.disabled = false;
+        }, 1500);
+      } catch(e) {
+        copyCodeBtn.textContent = 'Failed';
+        setTimeout(function() {
+          copyCodeBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy';
+        }, 1500);
+      }
+    });
+  }
+
+  closeSaved && closeSaved.addEventListener('click', closeSavedModal);
+  savedBackdrop && savedBackdrop.addEventListener('click', closeSavedModal);
+
   function toggle() {
     fileWrapper.style.display = typeSelect && typeSelect.value ? '' : 'none';
   }
@@ -124,8 +183,12 @@
   openBtn && openBtn.addEventListener('click', show);
   closeBtn && closeBtn.addEventListener('click', hide);
   backdrop && backdrop.addEventListener('click', hide);
+
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') hide();
+    if (e.key === 'Escape') {
+      if (savedModal && savedModal.parentNode) closeSavedModal();
+      else hide();
+    }
   });
 })();
 </script>

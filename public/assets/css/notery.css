@@ -158,7 +158,10 @@ body {
   font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Menlo', 'Consolas', monospace;
   font-size: 30px; font-weight: 700; letter-spacing: 6px;
   color: var(--text); background: var(--bg);
-  padding: 12px 28px; border-radius: var(--radius-sm); user-select: all; }
+  padding: 12px 28px; border-radius: var(--radius-sm);
+  user-select: all; cursor: pointer;
+  transition: background 0.15s ease; }
+.notery-code:hover { background: var(--border); }
 
 /* ── Button group ──────────────────────── */
 .notery-btn-group { display: flex; gap: 10px; }
