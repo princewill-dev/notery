@@ -7,7 +7,7 @@
     <h1 class="notery-logo">Your note</h1>
     @if(isset($maxViews) && $maxViews !== null)
       <p class="notery-views notery-mt-2">
-        Remaining views: <strong>{{ $remainingViews }}</strong> / {{ $maxViews }}
+        Remaining views: <strong>{{ $remainingViews }}</strong>
       </p>
     @endif
   </div>

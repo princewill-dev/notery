@@ -53,6 +53,23 @@
       </div>
 
       <button type="submit" id="saveButton" class="notery-btn notery-btn-primary notery-btn-block">Save note</button>
+
+      {{-- Upload progress (hidden until file upload starts) --}}
+      <div id="upload-progress" class="notery-upload-progress" style="display:none;">
+        <div class="notery-progress-header">
+          <span class="notery-progress-title">Uploading...</span>
+          <span class="notery-progress-percent" id="progress-percent">0%</span>
+        </div>
+        <div class="notery-progress-filename" id="progress-filename"></div>
+        <div class="notery-progress-bar-track">
+          <div class="notery-progress-bar-fill" id="progress-bar-fill"></div>
+        </div>
+        <div class="notery-progress-speed" id="progress-speed"></div>
+        <div class="notery-progress-error" id="progress-error" style="display:none;"></div>
+        <div class="notery-progress-cancel">
+          <button type="button" id="cancel-upload" class="notery-btn notery-btn-ghost notery-btn-sm">Cancel</button>
+        </div>
+      </div>
     </form>
   </div>
 
@@ -174,10 +191,6 @@
 
   document.addEventListener('DOMContentLoaded', toggle);
   typeSelect && typeSelect.addEventListener('change', toggle);
-  headerForm && saveButton && headerForm.addEventListener('submit', function() {
-    saveButton.disabled = true;
-    saveButton.textContent = 'Saving...';
-  });
   openBtn && openBtn.addEventListener('click', show);
   closeBtn && closeBtn.addEventListener('click', hide);
   backdrop && backdrop.addEventListener('click', hide);

@@ -10,6 +10,7 @@
   <meta name="description" content="Save and retrieve notes anonymously with a 4-digit code.">
   <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="/assets/css/notery.css">
+  @vite(['resources/js/app.js'])
   <title>Notery</title>
 </head>
 <body class="notery-shell">

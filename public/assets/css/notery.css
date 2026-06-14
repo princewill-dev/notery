@@ -224,6 +224,54 @@ body {
   .notery-modal { padding: 22px 18px; }
 }
 
+/* ── Upload Progress ────────────────────── */
+.notery-upload-progress {
+  margin-top: 16px; padding: 16px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.notery-progress-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+}
+.notery-progress-title {
+  font-size: 13px; font-weight: 600; color: var(--text-secondary);
+}
+.notery-progress-percent {
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+.notery-progress-filename {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.notery-progress-bar-track {
+  width: 100%; height: 8px; background: var(--border);
+  border-radius: 4px; overflow: hidden;
+}
+.notery-progress-bar-fill {
+  height: 100%; background: var(--accent); border-radius: 4px;
+  transition: width 0.2s ease; width: 0%;
+}
+.notery-progress-speed {
+  font-size: 11px; color: var(--text-muted); margin-top: 6px;
+}
+.notery-progress-error {
+  font-size: 13px; color: var(--danger); margin-top: 10px;
+  padding: 10px 12px; background: var(--danger-bg);
+  border: 1px solid var(--danger-border); border-radius: var(--radius-sm);
+}
+.notery-progress-cancel {
+  margin-top: 10px; text-align: right;
+}
+.notery-progress-cancel .notery-btn {
+  font-size: 12px; padding: 6px 14px;
+}
+.notery-progress-success {
+  text-align: center;
+}
+.notery-progress-success .notery-code {
+  margin: 12px 0 16px;
+}
+
 /* ── Utilities ─────────────────────────── */
 .notery-hidden { display: none !important; }
 .notery-text-center { text-align: center; }

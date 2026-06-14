@@ -14,6 +14,9 @@ class Kernel extends ConsoleKernel
     {
         // Run cleanup every hour to delete saves older than 3 hours
         $schedule->command('saves:cleanup')->hourly();
+
+        // Clean up abandoned chunk upload directories older than 24 hours
+        $schedule->command('saves:clean-chunks')->daily();
     }
 
     /**
