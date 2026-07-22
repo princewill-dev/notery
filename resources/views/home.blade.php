@@ -75,7 +75,10 @@
 
   <div class="notery-mt-4">
     <div class="notery-divider notery-mb-3">or</div>
-    <button type="button" id="openFindModal" class="notery-btn notery-btn-ghost notery-btn-block">Find a note by code</button>
+    <div class="notery-btn-group notery-mb-2">
+      <button type="button" id="openFindModal" class="notery-btn notery-btn-ghost">Find a note</button>
+      <button type="button" id="openPortalModal" class="notery-btn notery-btn-primary">Open Portal</button>
+    </div>
   </div>
 
 </div>
@@ -116,6 +119,58 @@
   </div>
 </div>
 @endif
+
+{{-- Portal create modal --}}
+<div id="portalCreateModal" aria-hidden="true" class="notery-hidden notery-modal-overlay">
+  <div id="portalModalBackdrop" style="position:absolute;inset:0;"></div>
+  <div class="notery-modal" style="position:relative;z-index:1;">
+    <div class="notery-modal-header">
+      <div class="notery-modal-title">Create a Portal</div>
+      <button type="button" id="closePortalModal" class="notery-btn notery-btn-ghost notery-btn-sm">Close</button>
+    </div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+      Share text and files in real-time with another device. The portal auto-closes after the duration you choose.
+    </p>
+    <div class="portal-duration-options" id="portalDurationOptions">
+      <label class="portal-duration-option">
+        <input type="radio" name="portalDuration" value="5" checked />
+        <span class="portal-duration-label">5 min</span>
+      </label>
+      <label class="portal-duration-option">
+        <input type="radio" name="portalDuration" value="10" />
+        <span class="portal-duration-label">10 min</span>
+      </label>
+      <label class="portal-duration-option">
+        <input type="radio" name="portalDuration" value="30" />
+        <span class="portal-duration-label">30 min</span>
+      </label>
+      <label class="portal-duration-option">
+        <input type="radio" name="portalDuration" value="60" />
+        <span class="portal-duration-label">1 hour</span>
+      </label>
+    </div>
+    <button type="button" id="createPortalBtn" class="notery-btn notery-btn-primary notery-btn-block notery-mt-3">Create Portal</button>
+    <div id="portalCreateError" style="display:none;margin-top:12px;font-size:13px;color:var(--danger);"></div>
+  </div>
+</div>
+
+{{-- Portal created success modal --}}
+<div id="portalCreatedModal" aria-hidden="true" class="notery-hidden notery-modal-overlay">
+  <div id="portalCreatedBackdrop" style="position:absolute;inset:0;"></div>
+  <div class="notery-modal notery-text-center" style="position:relative;z-index:1;">
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">Portal created</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Share this code with someone:</p>
+    <div class="notery-code" id="portalCreatedCode">----</div>
+    <button type="button" id="copyPortalCodeBtn" class="notery-btn notery-btn-secondary notery-btn-sm notery-mt-2" style="display:inline-flex;align-items:center;gap:6px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy
+    </button>
+    <div class="notery-mt-4 notery-btn-group">
+      <a href="#" id="portalOpenLink" class="notery-btn notery-btn-primary">Open Portal</a>
+      <button type="button" id="closePortalCreatedModal" class="notery-btn notery-btn-secondary">Close</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -198,9 +253,126 @@
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       if (savedModal && savedModal.parentNode) closeSavedModal();
+      else if (portalCreated && portalCreated.classList.contains('notery-hidden') === false) hidePortalCreated();
+      else if (portalCreate && portalCreate.classList.contains('notery-hidden') === false) hidePortalCreate();
       else hide();
     }
   });
+
+  // --- Portal creation modal ---
+  var portalCreate       = document.getElementById('portalCreateModal');
+  var portalCreateBtn    = document.getElementById('openPortalModal');
+  var portalCreateBackdrop = document.getElementById('portalModalBackdrop');
+  var closePortalCreate  = document.getElementById('closePortalModal');
+  var createPortalBtn    = document.getElementById('createPortalBtn');
+  var portalCreateError  = document.getElementById('portalCreateError');
+
+  var portalCreated       = document.getElementById('portalCreatedModal');
+  var portalCreatedBackdrop = document.getElementById('portalCreatedBackdrop');
+  var closePortalCreated  = document.getElementById('closePortalCreatedModal');
+  var portalCreatedCode   = document.getElementById('portalCreatedCode');
+  var portalOpenLink      = document.getElementById('portalOpenLink');
+  var copyPortalCodeBtn   = document.getElementById('copyPortalCodeBtn');
+
+  function showPortalCreate() {
+    portalCreate.classList.remove('notery-hidden');
+    portalCreate.setAttribute('aria-hidden', 'false');
+    if (portalCreateError) portalCreateError.style.display = 'none';
+  }
+
+  function hidePortalCreate() {
+    portalCreate.classList.add('notery-hidden');
+    portalCreate.setAttribute('aria-hidden', 'true');
+  }
+
+  function showPortalCreated(code) {
+    if (portalCreatedCode) portalCreatedCode.textContent = code;
+    if (portalOpenLink) portalOpenLink.href = '/p/' + code;
+    portalCreated.classList.remove('notery-hidden');
+    portalCreated.setAttribute('aria-hidden', 'false');
+  }
+
+  function hidePortalCreated() {
+    portalCreated.classList.add('notery-hidden');
+    portalCreated.setAttribute('aria-hidden', 'true');
+  }
+
+  portalCreateBtn && portalCreateBtn.addEventListener('click', showPortalCreate);
+  portalCreateBackdrop && portalCreateBackdrop.addEventListener('click', hidePortalCreate);
+  closePortalCreate && closePortalCreate.addEventListener('click', hidePortalCreate);
+  portalCreatedBackdrop && portalCreatedBackdrop.addEventListener('click', hidePortalCreated);
+  closePortalCreated && closePortalCreated.addEventListener('click', hidePortalCreated);
+
+  createPortalBtn && createPortalBtn.addEventListener('click', function() {
+    var selected = document.querySelector('input[name="portalDuration"]:checked');
+    var duration = selected ? selected.value : '5';
+
+    createPortalBtn.disabled = true;
+    createPortalBtn.textContent = 'Creating...';
+    if (portalCreateError) portalCreateError.style.display = 'none';
+
+    fetch('/portal/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({ duration: parseInt(duration, 10) }),
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.status === 'ok') {
+        window.location.href = '/p/' + data.code;
+      } else {
+        if (portalCreateError) {
+          portalCreateError.textContent = data.message || 'Failed to create portal';
+          portalCreateError.style.display = '';
+        }
+      }
+    })
+    .catch(function(err) {
+      if (portalCreateError) {
+        portalCreateError.textContent = 'Network error. Please try again.';
+        portalCreateError.style.display = '';
+      }
+    })
+    .finally(function() {
+      createPortalBtn.disabled = false;
+      createPortalBtn.textContent = 'Create Portal';
+    });
+  });
+
+  if (copyPortalCodeBtn && portalCreatedCode) {
+    copyPortalCodeBtn.addEventListener('click', function() {
+      var code = portalCreatedCode.textContent.trim();
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(code);
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = code;
+          ta.style.position = 'fixed'; ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        copyPortalCodeBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied';
+        copyPortalCodeBtn.disabled = true;
+        setTimeout(function() {
+          copyPortalCodeBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy';
+          copyPortalCodeBtn.disabled = false;
+        }, 1500);
+      } catch(e) {
+        copyPortalCodeBtn.textContent = 'Failed';
+        setTimeout(function() {
+          copyPortalCodeBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy';
+        }, 1500);
+      }
+    });
+  }
 })();
 </script>
 

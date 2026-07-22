@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Save;
+use App\Http\Controllers\PortalController;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
@@ -49,8 +50,11 @@ class CleanupOldSaves extends Command
             $save->delete();
             $deletedCount++;
         }
+
+        // Clean up expired and closed portal sessions
+        $deletedPortals = PortalController::deleteExpiredSessions();
         
-        $this->info("Cleanup complete: Deleted {$deletedCount} saves and {$deletedFilesCount} files.");
+        $this->info("Cleanup complete: Deleted {$deletedCount} saves, {$deletedFilesCount} files, and {$deletedPortals} portal sessions.");
         
         return Command::SUCCESS;
     }

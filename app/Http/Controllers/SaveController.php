@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PortalSession;
 use App\Models\Save;
 use App\Models\Stats;
 use Illuminate\Http\Request;
@@ -121,6 +122,15 @@ class SaveController extends Controller
         }
         
         $hashedCode = hash('sha256', $code); // Hash the input code for lookup
+
+        // Check if this is a portal code — redirect to portal page
+        $portal = PortalSession::where('code', $hashedCode)
+            ->where('status', 'active')
+            ->where('expires_at', '>', now())
+            ->first();
+        if ($portal) {
+            return redirect('/p/' . $code);
+        }
     
         // Retrieve the write-up associated with the provided code
         $encryptedData = Save::where('code', $hashedCode)->with('images')->first();

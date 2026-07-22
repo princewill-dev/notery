@@ -272,6 +272,213 @@ body {
   margin: 12px 0 16px;
 }
 
+/* ── Portal ────────────────────────────── */
+.portal-container {
+  width: 100%; max-width: 680px; height: calc(100vh - 160px); min-height: 500px;
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  position: relative;
+}
+
+.portal-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.portal-header-top {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.portal-code-block {
+  display: flex; align-items: center; gap: 8px;
+}
+.portal-code-label {
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.portal-code-value {
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 18px; font-weight: 700; letter-spacing: 3px;
+  color: var(--text);
+}
+.portal-header-actions {
+  display: flex; align-items: center; gap: 12px;
+}
+.portal-timer {
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 14px; font-weight: 600; color: var(--text-secondary);
+  min-width: 48px; text-align: right;
+}
+.portal-timer-warn { color: var(--danger); }
+.portal-connection {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 8px; font-size: 12px; color: var(--text-muted);
+}
+.portal-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-muted); flex-shrink: 0;
+}
+.portal-dot-active {
+  background: var(--success);
+  animation: portal-pulse 2s ease-in-out infinite;
+}
+@keyframes portal-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.portal-nav {
+  display: flex; gap: 16px; margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.portal-nav-link {
+  font-size: 12px; font-weight: 500; color: var(--text-muted);
+  text-decoration: none; transition: color 0.15s;
+}
+.portal-nav-link:hover { color: var(--text); }
+
+/* ── Portal feed ────────────────────────── */
+.portal-feed {
+  flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+  background: var(--bg);
+}
+.portal-feed-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 1; gap: 12px; color: var(--text-muted); text-align: center;
+  padding: 40px 20px;
+}
+.portal-feed-empty-icon { opacity: 0.3; }
+.portal-feed-empty p { font-size: 14px; max-width: 260px; }
+
+.portal-feed-notice {
+  text-align: center; padding: 20px;
+  font-size: 14px; color: var(--text-muted);
+  background: var(--surface); border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+/* ── Portal cards ───────────────────────── */
+.portal-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); overflow: hidden;
+  flex-shrink: 0;
+}
+.portal-card-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+}
+.portal-card-badge {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; padding: 2px 8px; border-radius: 4px;
+  flex-shrink: 0;
+}
+.portal-card-badge-text { background: var(--bg); color: var(--text-secondary); border: 1px solid var(--border); }
+.portal-card-badge-image { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+.portal-card-badge-pdf { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.portal-card-badge-video { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+.portal-card-badge-zip { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+.portal-card-badge-file { background: var(--bg); color: var(--text-secondary); border: 1px solid var(--border); }
+.portal-card-sender {
+  font-size: 12px; color: var(--text-muted); flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.portal-card-copy-btn {
+  margin-left: auto; flex-shrink: 0;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  background: var(--bg); border: 1px solid var(--border);
+  padding: 4px 12px; border-radius: var(--radius-sm); cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.portal-card-copy-btn:hover { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.portal-card-body { padding: 16px; overflow: hidden; }
+.portal-card-text {
+  font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word;
+  max-height: 350px; overflow-y: auto;
+}
+.portal-card-image {
+  display: block; max-width: 100%; max-height: 350px;
+  width: auto; height: auto; border-radius: 6px; cursor: pointer;
+  object-fit: contain;
+}
+.portal-card-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; border-top: 1px solid var(--border); background: var(--bg);
+}
+.portal-card-meta {
+  font-size: 12px; color: var(--text-muted); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.portal-card-file {
+  display: flex; align-items: center; gap: 14px;
+}
+.portal-card-file-icon {
+  flex-shrink: 0; color: var(--text-muted); opacity: 0.6;
+  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+}
+.portal-card-file-info { min-width: 0; flex: 1; }
+.portal-card-file-name {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.portal-card-file-meta {
+  font-size: 12px; color: var(--text-muted); margin-top: 2px;
+}
+
+/* ── Action bar ─────────────────────────── */
+.portal-action-bar {
+  flex-shrink: 0;
+  display: flex; flex-wrap: wrap; border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.portal-action-btn {
+  flex: 1 0 auto; min-width: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px; padding: 14px 8px; border: none; background: transparent;
+  color: var(--text-secondary); font-family: inherit; font-size: 11px;
+  font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s;
+  border-right: 1px solid var(--border);
+}
+.portal-action-btn:last-child { border-right: none; }
+.portal-action-btn:hover { background: var(--bg); color: var(--text); }
+.portal-action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Text modal ─────────────────────────── */
+.portal-textarea-modal {
+  width: 100%; min-height: 200px; padding: 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px; line-height: 1.7;
+  color: var(--text); background: var(--bg); outline: none;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+}
+.portal-textarea-modal:focus { border-color: var(--border-focus); box-shadow: var(--ring); }
+.portal-textarea-modal::placeholder { color: var(--text-muted); }
+
+/* ── Upload progress (portal) ───────────── */
+.portal-upload-progress {
+  padding: 16px 20px; border-top: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+
+/* ── Portal duration selector ───────────── */
+.portal-duration-options {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.portal-duration-option {
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 14px; font-weight: 600; color: var(--text-secondary);
+}
+.portal-duration-option:hover { border-color: var(--border-hover); background: var(--bg); }
+.portal-duration-option input { display: none; }
+.portal-duration-option:has(input:checked) {
+  border-color: var(--accent); background: var(--bg); color: var(--text);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.portal-duration-label { pointer-events: none; }
+
 /* ── Utilities ─────────────────────────── */
 .notery-hidden { display: none !important; }
 .notery-text-center { text-align: center; }
