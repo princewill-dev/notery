@@ -153,6 +153,7 @@ class PortalClient {
         try {
             const response = await fetch('/portal/' + this.code + '/message', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': this.getCsrfToken(),
@@ -194,6 +195,7 @@ class PortalClient {
         try {
             const response = await fetch('/portal/' + this.code + '/message', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'X-CSRF-TOKEN': this.getCsrfToken() },
                 body: formData,
             });
@@ -239,6 +241,7 @@ class PortalClient {
 
                 const response = await fetch('/portal/' + this.code + '/upload-chunk', {
                     method: 'POST',
+                    credentials: 'same-origin',
                     headers: { 'X-CSRF-TOKEN': this.getCsrfToken() },
                     body: fd,
                 });
@@ -254,6 +257,7 @@ class PortalClient {
 
             const assembleResp = await fetch('/portal/' + this.code + '/upload-assemble', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': this.getCsrfToken(),
@@ -291,7 +295,8 @@ class PortalClient {
 
         try {
             const response = await fetch(
-                '/portal/' + this.code + '/poll?since=' + this.lastMessageTs + '&peer_id=' + this.peerId
+                '/portal/' + this.code + '/poll?since=' + this.lastMessageTs + '&peer_id=' + this.peerId,
+                { credentials: 'same-origin' }
             );
             const data = await response.json();
 
@@ -524,6 +529,7 @@ class PortalClient {
         try {
             await fetch('/portal/' + this.code + '/close', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': this.getCsrfToken(),

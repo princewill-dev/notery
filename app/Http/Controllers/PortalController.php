@@ -45,10 +45,13 @@ class PortalController extends Controller
             'duration_minutes' => $duration,
             'expires_at' => now()->addMinutes($duration),
             'status' => 'active',
-            'peer_ids' => [$peerId],
+            'peer_ids' => [],
         ]);
 
         $request->session()->put('portal_peer_' . $code, $peerId);
+        $request->session()->save();
+
+        Log::info('Portal created', ['code' => $code, 'peer_id' => $peerId, 'session_id' => $request->session()->getId()]);
 
         return response()->json([
             'status' => 'ok',
@@ -84,19 +87,43 @@ class PortalController extends Controller
             return view('portal.expired', compact('errorMessage'));
         }
 
+        Log::info('Portal show: looking up session', [
+            'code' => $code,
+            'session_id' => $request->session()->getId(),
+            'session_peer_key' => $request->session()->get('portal_peer_' . $code),
+        ]);
+
         $peerIds = $session->peer_ids ?? [];
         $peerId = null;
 
         $sessionPeerId = $request->session()->get('portal_peer_' . $code);
+        Log::info('Portal show: peer assignment', [
+            'code' => $code,
+            'session_peer_id' => $sessionPeerId,
+            'db_peer_ids' => $peerIds,
+            'peer_count' => count($peerIds),
+        ]);
+
         if ($sessionPeerId && in_array($sessionPeerId, $peerIds)) {
             $peerId = $sessionPeerId;
+            Log::info('Portal show: reusing existing peer', ['peer_id' => $peerId]);
         } elseif (count($peerIds) < 2) {
             $peerId = Str::uuid()->toString();
             $peerIds[] = $peerId;
             $request->session()->put('portal_peer_' . $code, $peerId);
             $session->peer_ids = array_values($peerIds);
             $session->save();
+            Log::info('Portal show: assigned new peer', [
+                'peer_id' => $peerId,
+                'db_peer_ids_now' => $peerIds,
+                'session_peer_id_now' => $request->session()->get('portal_peer_' . $code),
+            ]);
         } else {
+            Log::warning('Portal show: portal full', [
+                'code' => $code,
+                'peer_ids' => $peerIds,
+                'session_peer_id' => $sessionPeerId,
+            ]);
             $errorMessage = 'This portal is full (maximum 2 participants)';
             return view('portal.expired', compact('errorMessage'));
         }
@@ -122,7 +149,22 @@ class PortalController extends Controller
         }
 
         $peerId = $this->getPeerId($request, $code);
+
+        Log::info('Portal poll', [
+            'code' => $code,
+            'peer_id' => $peerId,
+            'session_peer' => $request->session()->get('portal_peer_' . $code),
+            'query_peer' => $request->query('peer_id'),
+            'db_peer_ids' => $session->peer_ids,
+            'db_peer_count' => count($session->peer_ids ?? []),
+        ]);
+
         if (!$peerId || !in_array($peerId, $session->peer_ids ?? [])) {
+            Log::warning('Portal poll: not a participant', [
+                'code' => $code,
+                'peer_id' => $peerId,
+                'db_peer_ids' => $session->peer_ids,
+            ]);
             return response()->json([
                 'status' => 'error',
                 'message' => 'Not a participant',
