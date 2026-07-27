@@ -23,12 +23,20 @@ class PortalClient {
         this.lastActivity = Date.now();
         this.isClosed = false;
 
+        console.log('[Portal] Initializing...');
         this.cacheDom();
         this.loadConfig();
+        console.log('[Portal] Config loaded:', { code: this.code, peerId: this.peerId });
         if (this.code) {
             this.bind();
             this.startPolling();
             this.startTimer();
+            console.log('[Portal] Started polling and timer');
+        } else {
+            console.warn('[Portal] No config found — portal will not work');
+            if (this.dom.connectionText) {
+                this.dom.connectionText.textContent = 'Error: portal config not loaded';
+            }
         }
     }
 
@@ -293,6 +301,8 @@ class PortalClient {
     async poll() {
         if (this.isClosed) return;
 
+        console.log('[Portal] Polling...', { code: this.code, peerId: this.peerId, since: this.lastMessageTs });
+
         try {
             const response = await fetch(
                 '/portal/' + this.code + '/poll?since=' + this.lastMessageTs + '&peer_id=' + this.peerId,
@@ -300,8 +310,10 @@ class PortalClient {
             );
             const data = await response.json();
 
+            console.log('[Portal] Poll response:', { status: data.status, peerCount: data.peer_count, msgCount: (data.messages || []).length });
+
             if (data.status === 'error' || !response.ok) {
-                console.warn('Portal poll error:', data.status, data.message, 'peer_id:', this.peerId);
+                console.warn('[Portal] Poll error:', data.status, data.message, 'peer_id:', this.peerId);
                 if (data.message === 'Not a participant') {
                     this.handlePollError('Connection lost — refresh the page to reconnect.');
                 }
@@ -484,11 +496,11 @@ class PortalClient {
 
         if (peerCount >= 2) {
             this.dom.connection?.classList.add('portal-connected');
-            if (text) text.textContent = 'Connected';
+            if (text) text.textContent = 'Connected (' + peerCount + ' peers)';
             if (dot) dot.classList.add('portal-dot-active');
         } else {
             this.dom.connection?.classList.remove('portal-connected');
-            if (text) text.textContent = 'Waiting for partner...';
+            if (text) text.textContent = 'Waiting for partner... (' + peerCount + ' peer' + (peerCount === 1 ? '' : 's') + ')';
             if (dot) dot.classList.remove('portal-dot-active');
         }
     }

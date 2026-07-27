@@ -138,10 +138,17 @@ class PortalController extends Controller
 
     public function poll(Request $request, $code)
     {
+        Log::info('Portal poll: request received', [
+            'code' => $code,
+            'query_params' => $request->query(),
+            'session_id' => $request->session()->getId(),
+        ]);
+
         $hashedCode = hash('sha256', $code);
         $session = PortalSession::where('code', $hashedCode)->first();
 
         if (!$session) {
+            Log::warning('Portal poll: session not found', ['code' => $code, 'hashed' => $hashedCode]);
             return response()->json([
                 'status' => 'error',
                 'message' => 'Portal not found',
@@ -223,6 +230,12 @@ class PortalController extends Controller
 
             return $data;
         })->values()->toArray();
+
+        Log::info('Portal poll: success', [
+            'code' => $code,
+            'peer_count' => $peerCount,
+            'message_count' => count($messages),
+        ]);
 
         return response()->json([
             'status' => 'active',
