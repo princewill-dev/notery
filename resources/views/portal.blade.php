@@ -94,6 +94,14 @@ window.__portalConfig = {
   expiresAt: '{{ $expiresAt }}',
   portalUrl: '{{ $portalUrl }}',
 };
+
+(function() {
+  console.log('[Inline] Portal script running');
+  var connEl = document.getElementById('portalConnectionText');
+  if (connEl) {
+    connEl.textContent = 'JS loaded — waiting for module...';
+  }
+})();
 </script>
 
 <input type="file" id="portalFileInput" style="position:fixed;left:-9999px;top:0;" />
