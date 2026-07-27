@@ -45,8 +45,10 @@ class PortalController extends Controller
             'duration_minutes' => $duration,
             'expires_at' => now()->addMinutes($duration),
             'status' => 'active',
-            'peer_ids' => [],
+            'peer_ids' => [$peerId],
         ]);
+
+        $request->session()->put('portal_peer_' . $code, $peerId);
 
         return response()->json([
             'status' => 'ok',
@@ -54,7 +56,7 @@ class PortalController extends Controller
             'portal_url' => url('/p/' . $code),
             'peer_id' => $peerId,
             'expires_at' => now()->addMinutes($duration)->toIso8601String(),
-        ])->cookie('portal_peer_' . $code, $peerId, 60, '/', null, $request->secure(), false);
+        ]);
     }
 
     public function show(Request $request, $code)
@@ -65,50 +67,46 @@ class PortalController extends Controller
         }
 
         $hashedCode = hash('sha256', $code);
+        $session = PortalSession::where('code', $hashedCode)->first();
 
-        return \DB::transaction(function () use ($request, $code, $hashedCode) {
-            $session = PortalSession::where('code', $hashedCode)->lockForUpdate()->first();
+        if (!$session) {
+            $errorMessage = 'This portal does not exist';
+            return view('portal.expired', compact('errorMessage'));
+        }
 
-            if (!$session) {
-                $errorMessage = 'This portal does not exist';
-                return view('portal.expired', compact('errorMessage'));
-            }
+        if ($session->status === 'closed') {
+            $errorMessage = 'This portal has been closed';
+            return view('portal.expired', compact('errorMessage'));
+        }
 
-            if ($session->status === 'closed') {
-                $errorMessage = 'This portal has been closed';
-                return view('portal.expired', compact('errorMessage'));
-            }
+        if (now()->gt($session->expires_at)) {
+            $errorMessage = 'This portal has expired';
+            return view('portal.expired', compact('errorMessage'));
+        }
 
-            if (now()->gt($session->expires_at)) {
-                $errorMessage = 'This portal has expired';
-                return view('portal.expired', compact('errorMessage'));
-            }
+        $peerIds = $session->peer_ids ?? [];
+        $peerId = null;
 
-            $peerIds = $session->peer_ids ?? [];
-            $peerId = null;
+        $sessionPeerId = $request->session()->get('portal_peer_' . $code);
+        if ($sessionPeerId && in_array($sessionPeerId, $peerIds)) {
+            $peerId = $sessionPeerId;
+        } elseif (count($peerIds) < 2) {
+            $peerId = Str::uuid()->toString();
+            $peerIds[] = $peerId;
+            $request->session()->put('portal_peer_' . $code, $peerId);
+            $session->peer_ids = array_values($peerIds);
+            $session->save();
+        } else {
+            $errorMessage = 'This portal is full (maximum 2 participants)';
+            return view('portal.expired', compact('errorMessage'));
+        }
 
-            $cookiePeerId = $request->cookie('portal_peer_' . $code);
-            if ($cookiePeerId && in_array($cookiePeerId, $peerIds)) {
-                $peerId = $cookiePeerId;
-            } elseif (count($peerIds) < 2) {
-                $peerId = Str::uuid()->toString();
-                $peerIds[] = $peerId;
-                $session->peer_ids = array_values($peerIds);
-                $session->save();
-            } else {
-                $errorMessage = 'This portal is full (maximum 2 participants)';
-                return view('portal.expired', compact('errorMessage'));
-            }
-
-            return response()
-                ->view('portal', [
-                    'code' => $code,
-                    'peerId' => $peerId,
-                    'expiresAt' => $session->expires_at->toIso8601String(),
-                    'portalUrl' => url('/p/' . $code),
-                ])
-                ->cookie('portal_peer_' . $code, $peerId, 60, '/', null, $request->secure(), false);
-        });
+        return view('portal', [
+            'code' => $code,
+            'peerId' => $peerId,
+            'expiresAt' => $session->expires_at->toIso8601String(),
+            'portalUrl' => url('/p/' . $code),
+        ]);
     }
 
     public function poll(Request $request, $code)
@@ -708,7 +706,7 @@ class PortalController extends Controller
 
     private function getPeerId(Request $request, string $code): ?string
     {
-        return $request->cookie('portal_peer_' . $code)
+        return $request->session()->get('portal_peer_' . $code)
             ?? $request->query('peer_id')
             ?? $request->input('peer_id');
     }

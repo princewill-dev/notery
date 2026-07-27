@@ -295,6 +295,15 @@ class PortalClient {
             );
             const data = await response.json();
 
+            if (data.status === 'error' || !response.ok) {
+                console.warn('Portal poll error:', data.status, data.message, 'peer_id:', this.peerId);
+                if (data.message === 'Not a participant') {
+                    this.handlePollError('Connection lost — refresh the page to reconnect.');
+                }
+                this.scheduleNextPoll();
+                return;
+            }
+
             if (data.status === 'closed' || data.status === 'expired') {
                 this.handleClose(data.status);
                 return;
@@ -526,6 +535,15 @@ class PortalClient {
         }
 
         this.handleClose('closed');
+    }
+
+    handlePollError(message) {
+        if (this.dom.connectionText) {
+            this.dom.connectionText.textContent = message;
+        }
+        this.dom.connection?.classList.remove('portal-connected');
+        const dot = this.dom.connection?.querySelector('.portal-dot');
+        if (dot) dot.classList.remove('portal-dot-active');
     }
 
     handleClose(reason) {
