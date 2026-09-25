@@ -8,7 +8,9 @@ use App\Support\EncryptedFileWriter;
 use App\Models\PortalSession;
 use App\Models\PortalMessage;
 use App\Models\Save;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +27,9 @@ class PortalController extends Controller
     private const IMAGE_MAX_SIZE = 20 * 1024; // 20 MB in KB
     private const LARGE_MAX_SIZE = 512000;    // 500 MB in KB
     private const PEER_IDLE_SECONDS = 90;     // release a slot after this long without a poll
+
+    /** Hard cap on messages per portal to bound storage and poll payloads. */
+    private const MAX_MESSAGES_PER_PORTAL = 200;
 
     /** Upper bound on files in a single portal upload session. */
     private const MAX_FILES_PER_UPLOAD = 20;
@@ -231,11 +236,12 @@ class PortalController extends Controller
             }
         }
 
-        $messages = $query->get()->map(function ($msg) use ($code) {
+        $messages = $query->get()->map(function ($msg) use ($code, $peerId) {
             $data = [
                 'id' => $msg->id,
                 'type' => $msg->type,
-                'peer_id' => $msg->peer_id,
+                // Server-computed ownership: peer ids are not exposed to clients.
+                'is_mine' => $msg->peer_id === $peerId,
                 'created_at' => $msg->created_at->valueOf(),
             ];
 
@@ -247,13 +253,13 @@ class PortalController extends Controller
                 $data['image_mime'] = $msg->image_mime;
                 $data['image_size'] = $msg->image_size;
                 $data['view_url'] = $msg->image_path
-                    ? URL::temporarySignedRoute('portal.attachment', now()->addMinutes(10), [
+                    ? URL::temporarySignedRoute('portal.attachment', now()->addMinutes(5), [
                         'code' => $code,
                         'messageId' => $msg->id,
                     ])
                     : null;
                 $data['download_url'] = $msg->image_path
-                    ? URL::temporarySignedRoute('portal.download', now()->addMinutes(10), [
+                    ? URL::temporarySignedRoute('portal.download', now()->addMinutes(5), [
                         'code' => $code,
                         'messageId' => $msg->id,
                     ])
@@ -284,6 +290,13 @@ class PortalController extends Controller
         $this->touchPeer($session, $peerId);
         if (!$peerId || !in_array($peerId, $session->peer_ids ?? [])) {
             return response()->json(['status' => 'error', 'message' => 'Not a participant'], 403);
+        }
+
+        if ($session->messages()->count() >= self::MAX_MESSAGES_PER_PORTAL) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'This portal has reached its message limit',
+            ], 429);
         }
 
         $type = $request->input('type');
@@ -511,38 +524,53 @@ class PortalController extends Controller
                 Storage::disk('local')->put($chunkPath, file_get_contents($chunkFile->getRealPath()));
             }
 
-            $manifest = $this->readManifest($uploadId);
-            if ($manifest === null) {
-                $manifest = [
-                    'upload_id' => $uploadId,
-                    'created_at' => now()->toIso8601String(),
-                    'attachment_type' => $attachmentType,
-                    'portal_code' => $code,
-                    'files' => [],
-                ];
-            }
+            // Serialize the manifest read-modify-write so concurrent chunk
+            // requests cannot clobber each other's received_chunks.
+            try {
+                $fileManifest = Cache::lock('upload-manifest:' . $uploadId, 10)->block(
+                    5,
+                    function () use ($uploadId, $fileIndex, $chunkIndex, $totalChunks, $originalName, $attachmentType, $code) {
+                        $manifest = $this->readManifest($uploadId);
+                        if ($manifest === null) {
+                            $manifest = [
+                                'upload_id' => $uploadId,
+                                'created_at' => now()->toIso8601String(),
+                                'attachment_type' => $attachmentType,
+                                'portal_code' => $code,
+                                'files' => [],
+                            ];
+                        }
 
-            if (!isset($manifest['files'][(string) $fileIndex])) {
-                $manifest['files'][(string) $fileIndex] = [
-                    'original_name' => $originalName,
-                    'total_chunks' => $totalChunks,
-                    'received_chunks' => [],
-                ];
-            } elseif ((int) $manifest['files'][(string) $fileIndex]['total_chunks'] !== $totalChunks) {
+                        if (!isset($manifest['files'][(string) $fileIndex])) {
+                            $manifest['files'][(string) $fileIndex] = [
+                                'original_name' => $originalName,
+                                'total_chunks' => $totalChunks,
+                                'received_chunks' => [],
+                            ];
+                        } elseif ((int) $manifest['files'][(string) $fileIndex]['total_chunks'] !== $totalChunks) {
+                            throw new UploadValidationException(
+                                'Chunk metadata does not match earlier chunks for this file',
+                                409
+                            );
+                        }
+
+                        if (!in_array($chunkIndex, $manifest['files'][(string) $fileIndex]['received_chunks'], true)) {
+                            $manifest['files'][(string) $fileIndex]['received_chunks'][] = $chunkIndex;
+                            sort($manifest['files'][(string) $fileIndex]['received_chunks']);
+                        }
+
+                        $this->writeManifest($uploadId, $manifest);
+
+                        return $manifest['files'][(string) $fileIndex];
+                    }
+                );
+            } catch (LockTimeoutException $e) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Chunk metadata does not match earlier chunks for this file',
-                ], 409);
+                    'message' => 'Upload is busy, please retry',
+                ], 503);
             }
 
-            if (!in_array($chunkIndex, $manifest['files'][(string) $fileIndex]['received_chunks'], true)) {
-                $manifest['files'][(string) $fileIndex]['received_chunks'][] = $chunkIndex;
-                sort($manifest['files'][(string) $fileIndex]['received_chunks']);
-            }
-
-            $this->writeManifest($uploadId, $manifest);
-
-            $fileManifest = $manifest['files'][(string) $fileIndex];
 
             return response()->json([
                 'status' => 'ok',
@@ -550,6 +578,16 @@ class PortalController extends Controller
                 'received_chunks' => $fileManifest['received_chunks'],
                 'total_chunks' => $totalChunks,
             ]);
+        } catch (UploadValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], $e->status());
+        } catch (LockTimeoutException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Upload is busy, please retry',
+            ], 503);
         } catch (\Exception $e) {
             Log::error('Portal chunk upload failed', [
                 'error' => $e->getMessage(),
@@ -831,6 +869,8 @@ class PortalController extends Controller
             abort(404);
         }
 
+        $this->assertPortalParticipant($request, $session, $code);
+
         // Only serve a strict allowlist of raster images inline. Anything else
         // (including SVG) is forced to download so it can never execute in the
         // app origin, and nosniff stops MIME confusion in the browser.
@@ -881,6 +921,8 @@ class PortalController extends Controller
         if (!Storage::exists($message->image_path)) {
             abort(404);
         }
+
+        $this->assertPortalParticipant($request, $session, $code);
 
         // Sanitize defensively: legacy rows may hold a name with a path
         // separator, which makes Storage::download throw a 500.
@@ -963,9 +1005,10 @@ class PortalController extends Controller
 
     private function getPeerId(Request $request, string $code): ?string
     {
-        return $request->session()->get('portal_peer_' . $code)
-            ?? $request->query('peer_id')
-            ?? $request->input('peer_id');
+        // Peer identity comes only from the session. Accepting a client-supplied
+        // peer_id let anyone holding the UUID act as that peer, and put the id
+        // into URLs and access logs.
+        return $request->session()->get('portal_peer_' . $code);
     }
 
     private function generateUniqueCode(int $length = 4, int $maxAttempts = 50): string
@@ -1253,5 +1296,23 @@ class PortalController extends Controller
         }
 
         return $this->fallbackExtension($attachmentType);
+    }
+
+    /**
+     * A signed download URL is only useful to an active participant of a live
+     * portal. Binding it to the session stops leaked links from being replayed
+     * by anyone else, including after the portal closes or expires.
+     */
+    private function assertPortalParticipant(Request $request, PortalSession $session, string $code): void
+    {
+        if ($session->status !== 'active' || now()->gt($session->expires_at)) {
+            abort(410, 'Portal is no longer active');
+        }
+
+        $peerId = $request->session()->get('portal_peer_' . $code);
+
+        if (!$peerId || !in_array($peerId, $session->peer_ids ?? [], true)) {
+            abort(403, 'Not a participant');
+        }
     }
 }

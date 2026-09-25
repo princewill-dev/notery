@@ -25,17 +25,13 @@ class PortalClient {
         this.lastActivity = Date.now();
         this.isClosed = false;
 
-        console.log('[Portal] Initializing...');
         this.cacheDom();
         this.loadConfig();
-        console.log('[Portal] Config loaded:', { code: this.code, peerId: this.peerId });
         if (this.code) {
             this.bind();
             this.startPolling();
             this.startTimer();
-            console.log('[Portal] Started polling and timer');
         } else {
-            console.warn('[Portal] No config found — portal will not work');
             if (this.dom.connectionText) {
                 this.dom.connectionText.textContent = 'Error: portal config not loaded';
             }
@@ -171,7 +167,6 @@ class PortalClient {
                 body: JSON.stringify({
                     type: 'text',
                     content: content,
-                    peer_id: this.peerId,
                 }),
             });
 
@@ -196,7 +191,6 @@ class PortalClient {
         const formData = new FormData();
         formData.append('type', mimeType);
         formData.append('file', file);
-        formData.append('peer_id', this.peerId);
 
         if (action !== 'image') {
             formData.append('attachment_type', this.mapActionToType(action));
@@ -247,7 +241,6 @@ class PortalClient {
                 fd.append('original_name', file.name);
                 fd.append('attachment_type', attType);
                 fd.append('chunk', chunk, file.name);
-                fd.append('peer_id', this.peerId);
 
                 const response = await fetch('/portal/' + this.code + '/upload-chunk', {
                     method: 'POST',
@@ -276,7 +269,6 @@ class PortalClient {
                     upload_id: uploadId,
                     attachment_type: attType,
                     files: [{ index: 0, original_name: file.name }],
-                    peer_id: this.peerId,
                 }),
             });
 
@@ -306,8 +298,7 @@ class PortalClient {
 
         try {
             const response = await fetch(
-                '/portal/' + this.code + '/poll?last_id=' + this.lastMessageId
-                    + '&peer_id=' + encodeURIComponent(this.peerId),
+                '/portal/' + this.code + '/poll?last_id=' + this.lastMessageId,
                 {
                     credentials: 'same-origin',
                     headers: { 'Accept': 'application/json' },
@@ -384,7 +375,7 @@ class PortalClient {
                 this.lastMessageId = msg.id;
             }
 
-            const isMine = msg.peer_id === this.peerId;
+            const isMine = !!msg.is_mine;
             const senderLabel = isMine ? 'You' : 'Guest';
 
             if (msg.type === 'text') {
@@ -566,7 +557,7 @@ class PortalClient {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': this.getCsrfToken(),
                 },
-                body: JSON.stringify({ peer_id: this.peerId }),
+                body: JSON.stringify({}),
             });
         } catch (err) {
             console.error('Close portal error:', err);

@@ -9,6 +9,9 @@ use App\Models\PortalSession;
 use App\Exceptions\UploadValidationException;
 use App\Support\EncryptedFileWriter;
 use Illuminate\Http\Request;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -162,39 +165,54 @@ class UploadController extends Controller
                 Storage::disk('local')->put($chunkPath, file_get_contents($chunkFile->getRealPath()));
             }
 
-            // Update the manifest atomically
-            $manifest = $this->readManifest($uploadId);
-            if ($manifest === null) {
-                $manifest = [
-                    'upload_id'   => $uploadId,
-                    'created_at'  => now()->toIso8601String(),
-                    'attachment_type' => $attachmentType,
-                    'files'       => [],
-                ];
-            }
+            // Serialize the manifest read-modify-write. Concurrent chunk
+            // requests previously clobbered each other's received_chunks, which
+            // made assembly report chunks as missing even though they uploaded.
+            try {
+                $fileManifest = Cache::lock('upload-manifest:' . $uploadId, 10)->block(
+                    5,
+                    function () use ($uploadId, $fileIndex, $chunkIndex, $totalChunks, $originalName, $attachmentType) {
+                        $manifest = $this->readManifest($uploadId);
+                        if ($manifest === null) {
+                            $manifest = [
+                                'upload_id'   => $uploadId,
+                                'created_at'  => now()->toIso8601String(),
+                                'attachment_type' => $attachmentType,
+                                'files'       => [],
+                            ];
+                        }
 
-            if (!isset($manifest['files'][(string) $fileIndex])) {
-                $manifest['files'][(string) $fileIndex] = [
-                    'original_name'  => $originalName,
-                    'total_chunks'   => $totalChunks,
-                    'received_chunks' => [],
-                ];
-            } elseif ((int) $manifest['files'][(string) $fileIndex]['total_chunks'] !== $totalChunks) {
+                        if (!isset($manifest['files'][(string) $fileIndex])) {
+                            $manifest['files'][(string) $fileIndex] = [
+                                'original_name'  => $originalName,
+                                'total_chunks'   => $totalChunks,
+                                'received_chunks' => [],
+                            ];
+                        } elseif ((int) $manifest['files'][(string) $fileIndex]['total_chunks'] !== $totalChunks) {
+                            throw new UploadValidationException(
+                                'Chunk metadata does not match earlier chunks for this file',
+                                409
+                            );
+                        }
+
+                        // Mark this chunk as received (avoid duplicates)
+                        if (!in_array($chunkIndex, $manifest['files'][(string) $fileIndex]['received_chunks'], true)) {
+                            $manifest['files'][(string) $fileIndex]['received_chunks'][] = $chunkIndex;
+                            sort($manifest['files'][(string) $fileIndex]['received_chunks']);
+                        }
+
+                        $this->writeManifest($uploadId, $manifest);
+
+                        return $manifest['files'][(string) $fileIndex];
+                    }
+                );
+            } catch (LockTimeoutException $e) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Chunk metadata does not match earlier chunks for this file',
-                ], 409);
+                    'message' => 'Upload is busy, please retry',
+                ], 503);
             }
 
-            // Mark this chunk as received (avoid duplicates)
-            if (!in_array($chunkIndex, $manifest['files'][(string) $fileIndex]['received_chunks'], true)) {
-                $manifest['files'][(string) $fileIndex]['received_chunks'][] = $chunkIndex;
-                sort($manifest['files'][(string) $fileIndex]['received_chunks']);
-            }
-
-            $this->writeManifest($uploadId, $manifest);
-
-            $fileManifest = $manifest['files'][(string) $fileIndex];
 
             return response()->json([
                 'status'          => 'ok',
@@ -202,6 +220,16 @@ class UploadController extends Controller
                 'received_chunks' => $fileManifest['received_chunks'],
                 'total_chunks'    => $totalChunks,
             ]);
+        } catch (UploadValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => $e->getMessage(),
+            ], $e->status());
+        } catch (LockTimeoutException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Upload is busy, please retry',
+            ], 503);
         } catch (\Exception $e) {
             Log::error('Chunk upload failed', [
                 'error' => $e->getMessage(),
@@ -401,14 +429,31 @@ class UploadController extends Controller
                 $result = \DB::transaction(function () use ($validated, $assembledFiles) {
                     $encryptedContent = Crypt::encryptString($validated['writeup']);
 
-                    [$code, $hashedCode] = $this->allocateUniqueCode();
+                    // Retry inside a nested transaction (savepoint) so losing a
+                    // code race does not poison the outer transaction.
+                    [$save, $code] = \DB::transaction(function () use ($encryptedContent, $validated) {
+                        $lastException = null;
 
-                    $save = new Save;
-                    $save->writeup    = $encryptedContent;
-                    $save->code       = $hashedCode;
-                    $save->max_views  = $validated['max_views'] ?? 1;
-                    $save->views_count = 0;
-                    $save->save();
+                        for ($attempt = 0; $attempt < 5; $attempt++) {
+                            [$candidate, $hashedCode] = $this->allocateUniqueCode();
+
+                            $save = new Save;
+                            $save->writeup    = $encryptedContent;
+                            $save->code       = $hashedCode;
+                            $save->max_views  = $validated['max_views'] ?? 1;
+                            $save->views_count = 0;
+
+                            try {
+                                $save->save();
+
+                                return [$save, $candidate];
+                            } catch (UniqueConstraintViolationException $e) {
+                                $lastException = $e;
+                            }
+                        }
+
+                        throw $lastException ?? new \RuntimeException('Unable to allocate a unique code');
+                    });
 
                     // Create SaveImage records
                     foreach ($assembledFiles as $file) {

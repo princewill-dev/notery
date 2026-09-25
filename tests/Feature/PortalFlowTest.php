@@ -103,4 +103,52 @@ class PortalFlowTest extends TestCase
 
         $this->get('/p/7777')->assertStatus(200)->assertSee('closed');
     }
+
+    public function test_a_peer_id_from_the_request_is_not_accepted(): void
+    {
+        $create = $this->postJson('/portal/create', ['duration' => 5]);
+        $code = $create->json('code');
+        $peerId = $create->json('peer_id');
+
+        $this->get('/p/' . $code)->assertStatus(200);
+
+        // A different client (no session) presenting the peer id must be rejected.
+        $this->flushSession();
+
+        $this->getJson('/portal/' . $code . '/poll?last_id=0&peer_id=' . $peerId)
+            ->assertStatus(403);
+
+        $this->postJson('/portal/' . $code . '/message', [
+            'type' => 'text',
+            'content' => 'spoofed',
+            'peer_id' => $peerId,
+        ])->assertStatus(403);
+    }
+
+    public function test_the_message_limit_is_enforced(): void
+    {
+        $create = $this->postJson('/portal/create', ['duration' => 5]);
+        $code = $create->json('code');
+        $this->get('/p/' . $code)->assertStatus(200);
+
+        $portal = PortalSession::first();
+        $peerId = $portal->peer_ids[0] ?? 'peer';
+
+        $rows = [];
+        for ($i = 0; $i < 200; $i++) {
+            $rows[] = [
+                'portal_session_id' => $portal->id,
+                'type' => 'text',
+                'content' => 'x',
+                'peer_id' => $peerId,
+                'created_at' => now(),
+            ];
+        }
+        \Illuminate\Support\Facades\DB::table('portal_messages')->insert($rows);
+
+        $this->postJson('/portal/' . $code . '/message', [
+            'type' => 'text',
+            'content' => 'one too many',
+        ])->assertStatus(429);
+    }
 }

@@ -10,9 +10,14 @@ class TrustProxies extends Middleware
     /**
      * The trusted proxies for this application.
      *
+     * The app runs behind a TLS-terminating proxy (Docker network / platform
+     * load balancer), so forwarded headers must be trusted for correct scheme
+     * detection and signed URLs. Tighten with TRUSTED_PROXIES if the app is
+     * ever exposed directly.
+     *
      * @var array<int, string>|string|null
      */
-    protected $proxies;
+    protected $proxies = '*';
 
     /**
      * The headers that should be used to detect proxies.

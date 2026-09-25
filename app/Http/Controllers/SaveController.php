@@ -7,6 +7,7 @@ use App\Models\Save;
 use App\Models\Stats;
 use App\Support\EncryptedFile;
 use Illuminate\Http\Request;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -34,17 +35,6 @@ class SaveController extends Controller
     }
 
     public function saveFunction(Request $request) {
-        // Allocate a code that is unique across notes and portals, with a hard
-        // attempt cap so a saturated keyspace cannot pin a PHP worker.
-        try {
-            [$code, $hashedCode] = $this->allocateUniqueCode();
-        } catch (\RuntimeException $e) {
-            Log::error('Code allocation failed on save', ['error' => $e->getMessage()]);
-            throw ValidationException::withMessages([
-                'writeup' => 'We could not allocate a code right now. Please try again in a moment.',
-            ]);
-        }
-
         // Validate the submitted data: write-up required, optional attachment and optional max_views
         try {
             $validator = Validator::make($request->all(), [
@@ -78,14 +68,20 @@ class SaveController extends Controller
         }
     
         $encryptedContent = Crypt::encryptString($validateData['writeup']);
-    
-        $contentdata = new Save;
-        $contentdata->writeup = $encryptedContent;
-        $contentdata->code = $hashedCode; // Store the hashed code
-        $contentdata->max_views = $validateData['max_views'] ?? 1;
-        $contentdata->views_count = 0;
-        // Save the note
-        $contentdata->save();
+
+        // Allocate and persist, retrying if a concurrent insert wins the same
+        // code (the unique index rejects the loser).
+        try {
+            [$contentdata, $code] = $this->createSaveRecord(
+                $encryptedContent,
+                (int) ($validateData['max_views'] ?? 1)
+            );
+        } catch (\RuntimeException $e) {
+            Log::error('Code allocation failed on save', ['error' => $e->getMessage()]);
+            throw ValidationException::withMessages([
+                'writeup' => 'We could not allocate a code right now. Please try again in a moment.',
+            ]);
+        }
 
         if ($request->hasFile('attachment')) {
             $attachmentType = $validateData['attachment_type'] ?? null;
@@ -211,7 +207,7 @@ class SaveController extends Controller
                 // Prepare attachments as signed download URLs (from DB)
                 $attachments = [];
                 foreach ($lockedData->images as $img) {
-                    $url = URL::temporarySignedRoute('attachments.download', now()->addMinutes(10), ['id' => $img->id]);
+                    $url = URL::temporarySignedRoute('attachments.download', now()->addMinutes(5), ['id' => $img->id]);
                     $attachments[] = [
                         'url' => $url,
                         'mime' => $img->image_mime,
@@ -227,7 +223,7 @@ class SaveController extends Controller
                         'path' => null,
                         'size' => null,
                     ]);
-                    $url = URL::temporarySignedRoute('attachments.download', now()->addMinutes(10), ['id' => $legacy->id]);
+                    $url = URL::temporarySignedRoute('attachments.download', now()->addMinutes(5), ['id' => $legacy->id]);
                     $attachments[] = [
                         'url' => $url,
                         'mime' => $lockedData->image_mime,
@@ -345,5 +341,36 @@ class SaveController extends Controller
                 default => 'bin',
             },
         };
+    }
+
+    /**
+     * Persist a note, retrying if a concurrent request claims the same code
+     * (the unique index rejects the loser).
+     *
+     * @return array{0: Save, 1: string} [the saved model, the plain code]
+     */
+    private function createSaveRecord(string $encryptedContent, int $maxViews, int $maxAttempts = 5): array
+    {
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            [$code, $hashedCode] = $this->allocateUniqueCode();
+
+            $save = new Save;
+            $save->writeup = $encryptedContent;
+            $save->code = $hashedCode;
+            $save->max_views = $maxViews;
+            $save->views_count = 0;
+
+            try {
+                $save->save();
+
+                return [$save, $code];
+            } catch (UniqueConstraintViolationException $e) {
+                if ($attempt === $maxAttempts - 1) {
+                    throw new \RuntimeException('Unable to persist a note with a unique code', 0, $e);
+                }
+            }
+        }
+
+        throw new \RuntimeException('Unable to persist a note with a unique code');
     }
 }

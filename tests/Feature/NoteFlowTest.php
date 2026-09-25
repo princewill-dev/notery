@@ -89,4 +89,23 @@ class NoteFlowTest extends TestCase
         $this->assertDatabaseMissing('saves', ['id' => $save->id]);
         $this->assertDatabaseMissing('save_images', ['save_id' => $save->id]);
     }
+
+    public function test_save_codes_are_unique(): void
+    {
+        $make = function (string $writeup) {
+            $save = new Save;
+            $save->writeup = Crypt::encryptString($writeup);
+            $save->code = hash('sha256', '1111');
+            $save->max_views = 5;
+            $save->views_count = 0;
+
+            return $save;
+        };
+
+        $make('first')->save();
+
+        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+
+        $make('duplicate')->save();
+    }
 }
