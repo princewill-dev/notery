@@ -6,7 +6,7 @@ const FILE_LIMITS = {
 };
 
 const FILE_ACCEPT = {
-    image: 'image/*',
+    image: 'image/jpeg,image/png,image/gif,image/webp',
     pdf:   'application/pdf',
     video: 'video/*',
     zip:   'application/zip,.zip',
@@ -18,7 +18,9 @@ class PortalClient {
         this.peerId = null;
         this.expiresAt = null;
         this.pollInterval = 1500;
-        this.lastMessageTs = 0;
+        this.lastMessageId = 0;
+        this.seenMessageIds = new Set();
+        this.pollInFlight = false;
         this.pollTimer = null;
         this.lastActivity = Date.now();
         this.isClosed = false;
@@ -299,21 +301,27 @@ class PortalClient {
     }
 
     async poll() {
-        if (this.isClosed) return;
-
-        console.log('[Portal] Polling...', { code: this.code, peerId: this.peerId, since: this.lastMessageTs });
+        if (this.isClosed || this.pollInFlight) return;
+        this.pollInFlight = true;
 
         try {
             const response = await fetch(
-                '/portal/' + this.code + '/poll?since=' + this.lastMessageTs + '&peer_id=' + this.peerId,
-                { credentials: 'same-origin' }
+                '/portal/' + this.code + '/poll?last_id=' + this.lastMessageId
+                    + '&peer_id=' + encodeURIComponent(this.peerId),
+                {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' },
+                }
             );
+
+            if (response.status === 429) {
+                this.scheduleNextPoll(3000);
+                return;
+            }
+
             const data = await response.json();
 
-            console.log('[Portal] Poll response:', { status: data.status, peerCount: data.peer_count, msgCount: (data.messages || []).length });
-
             if (data.status === 'error' || !response.ok) {
-                console.warn('[Portal] Poll error:', data.status, data.message, 'peer_id:', this.peerId);
                 if (data.message === 'Not a participant') {
                     this.handlePollError('Connection lost — refresh the page to reconnect.');
                 }
@@ -334,21 +342,24 @@ class PortalClient {
             this.updateExpiresAt(data.expires_at);
         } catch (err) {
             console.error('Portal poll error:', err);
+        } finally {
+            this.pollInFlight = false;
         }
 
         this.scheduleNextPoll();
     }
 
     startPolling() {
-        this.lastMessageTs = 0;
+        this.lastMessageId = 0;
+        this.seenMessageIds = new Set();
         this.lastActivity = Date.now();
         this.poll();
     }
 
-    scheduleNextPoll() {
+    scheduleNextPoll(overrideInterval) {
         if (this.isClosed) return;
         const idle = (Date.now() - this.lastActivity) > 30000;
-        const interval = idle ? 3000 : 1500;
+        const interval = overrideInterval || (idle ? 3000 : 1500);
         this.pollTimer = setTimeout(() => this.poll(), interval);
     }
 
@@ -360,8 +371,17 @@ class PortalClient {
         const wasAtBottom = this.isScrolledToBottom();
 
         for (const msg of messages) {
-            if (this.lastMessageTs < msg.created_at) {
-                this.lastMessageTs = msg.created_at;
+            // De-duplicate by id: polls can overlap with a send, and the server
+            // may return a message that was already rendered.
+            if (this.seenMessageIds.has(msg.id)) {
+                continue;
+            }
+            this.seenMessageIds.add(msg.id);
+
+            // Advance the cursor monotonically by id (created_at only has
+            // second precision, which used to drop same-second messages).
+            if (typeof msg.id === 'number' && msg.id > this.lastMessageId) {
+                this.lastMessageId = msg.id;
             }
 
             const isMine = msg.peer_id === this.peerId;
@@ -638,9 +658,14 @@ class PortalClient {
     }
 
     escapeHtml(str) {
-        const div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
-        return div.innerHTML;
+        // Context-safe escaping. The previous text-node trick left `"` intact,
+        // which allowed a crafted file name to break out of alt="…".
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     formatSize(bytes) {

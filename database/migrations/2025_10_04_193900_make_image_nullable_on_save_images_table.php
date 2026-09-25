@@ -10,8 +10,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // PostgreSQL: make the image column nullable to support disk-based storage
-        DB::statement('ALTER TABLE save_images ALTER COLUMN image DROP NOT NULL');
+        // PostgreSQL: ensure the image column is nullable for disk-based
+        // storage. Fresh installs already create it nullable, and SQLite does
+        // not support this ALTER form, so only run it on pgsql.
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE save_images ALTER COLUMN image DROP NOT NULL');
+        }
     }
 
     /**
@@ -19,7 +23,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Revert: set NOT NULL again (may fail if nulls exist). Use with caution.
-        DB::statement('ALTER TABLE save_images ALTER COLUMN image SET NOT NULL');
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            // May fail if nulls exist. Use with caution.
+            DB::statement('ALTER TABLE save_images ALTER COLUMN image SET NOT NULL');
+        }
     }
 };

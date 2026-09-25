@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class PortalSession extends Model
 {
-    protected $fillable = ['code', 'duration_minutes', 'expires_at', 'status', 'peer_ids'];
+    protected $fillable = ['code', 'duration_minutes', 'expires_at', 'status', 'peer_ids', 'peer_seen_at'];
 
     protected $casts = [
         'peer_ids' => 'array',
+        'peer_seen_at' => 'array',
         'expires_at' => 'datetime',
     ];
 

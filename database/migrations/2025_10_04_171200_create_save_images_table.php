@@ -14,7 +14,8 @@ return new class extends Migration
         Schema::create('save_images', function (Blueprint $table) {
             $table->id();
             $table->foreignId('save_id')->constrained('saves')->onDelete('cascade');
-            $table->longText('image');
+            // Nullable: disk-based attachments store bytes in `path` instead.
+            $table->longText('image')->nullable();
             $table->string('image_mime');
             $table->timestamps();
         });

@@ -447,9 +447,14 @@ class ChunkedUploader {
     }
 
     escapeHtml(str) {
-        const div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
-        return div.innerHTML;
+        // Escape quotes as well as angle brackets: this value is interpolated
+        // into HTML attributes (alt, href) where a bare quote would break out.
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     fallbackUUID() {

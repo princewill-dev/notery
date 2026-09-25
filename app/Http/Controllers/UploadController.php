@@ -6,6 +6,7 @@ use App\Models\Save;
 use App\Models\SaveImage;
 use App\Models\Stats;
 use App\Models\PortalSession;
+use App\Exceptions\UploadValidationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +20,11 @@ class UploadController extends Controller
      * Maximum size of a single chunk in bytes (5 MB + 1 MB overhead buffer).
      */
     private const MAX_CHUNK_SIZE = 6 * 1024 * 1024;
+
+    /**
+     * Upper bound on the number of files in a single upload session.
+     */
+    private const MAX_FILES_PER_UPLOAD = 20;
 
     /**
      * Allowed attachment types.
@@ -110,6 +116,23 @@ class UploadController extends Controller
             $originalName = $validated['original_name'];
             $attachmentType = $validated['attachment_type'];
 
+            // Server-side caps: the client-side limits are advisory only.
+            $limits = $this->limitsForType($attachmentType);
+
+            if ($fileIndex >= self::MAX_FILES_PER_UPLOAD) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Too many files in this upload',
+                ], 422);
+            }
+
+            if ($totalChunks > $limits['max_chunks']) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'File is too large (too many chunks)',
+                ], 413);
+            }
+
             // Validate magic bytes on the first chunk of each file
             if ($chunkIndex === 0) {
                 $chunkData = file_get_contents($chunkFile->getRealPath());
@@ -155,6 +178,11 @@ class UploadController extends Controller
                     'total_chunks'   => $totalChunks,
                     'received_chunks' => [],
                 ];
+            } elseif ((int) $manifest['files'][(string) $fileIndex]['total_chunks'] !== $totalChunks) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Chunk metadata does not match earlier chunks for this file',
+                ], 409);
             }
 
             // Mark this chunk as received (avoid duplicates)
@@ -241,10 +269,48 @@ class UploadController extends Controller
                 }
             }
 
-            // Assemble files within a database transaction
-            return \DB::transaction(function () use ($uploadId, $attachmentType, $validated, $manifest, $filesMeta) {
-                $assembledFiles = [];
+            // Server-side cap: sum actual chunk bytes before assembling so an
+            // attacker cannot bypass the advertised limits by calling the API.
+            if (count($filesMeta) > self::MAX_FILES_PER_UPLOAD) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Too many files in this upload',
+                ], 422);
+            }
 
+            $limits = $this->limitsForType($attachmentType);
+            $totalUploadBytes = 0;
+
+            foreach ($filesMeta as $fileMeta) {
+                $idx = (int) $fileMeta['index'];
+                $fileManifest = $manifest['files'][(string) $idx] ?? null;
+                if ($fileManifest === null) {
+                    continue;
+                }
+                for ($ci = 0; $ci < (int) $fileManifest['total_chunks']; $ci++) {
+                    $chunkPath = $this->chunkDir($uploadId) . '/' . $idx . '_' . $ci;
+                    $chunkFullPath = Storage::disk('local')->path($chunkPath);
+                    if (is_file($chunkFullPath)) {
+                        $totalUploadBytes += (int) filesize($chunkFullPath);
+                    }
+                }
+            }
+
+            if ($totalUploadBytes > $limits['max_bytes']) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Upload exceeds the maximum size for ' . $attachmentType,
+                ], 413);
+            }
+
+            // Assemble files to disk BEFORE opening a transaction, and track
+            // every path written so a failure can clean up after itself. Doing
+            // IO inside the transaction left orphaned files when the DB rolled
+            // back.
+            $assembledFiles = [];
+            $writtenPaths = [];
+
+            try {
                 if (!empty($filesMeta)) {
                     foreach ($filesMeta as $fileMeta) {
                         $fileIndex = (int) $fileMeta['index'];
@@ -257,11 +323,9 @@ class UploadController extends Controller
 
                         $totalChunks = $fileManifest['total_chunks'];
 
-                        // Determine extension from original name
-                        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-                        if ($ext === '' || $ext === 'bin') {
-                            $ext = $this->fallbackExtension($attachmentType);
-                        }
+                        // Derive the extension from the declared type, never from
+                        // the client filename, so .php/.html cannot be stored.
+                        $ext = $this->extensionForType($attachmentType);
 
                         // Generate output filename (matching existing pattern)
                         $filename = Str::uuid()->toString() . '.' . $ext;
@@ -273,6 +337,10 @@ class UploadController extends Controller
                         if (!is_dir($noteryDir)) {
                             mkdir($noteryDir, 0755, true);
                         }
+
+                        // Register the path before writing so a mid-write
+                        // failure still cleans up the partial file.
+                        $writtenPaths[] = $fullOutputPath;
 
                         // Stream-assemble chunks into the final file
                         $out = fopen($fullOutputPath, 'wb');
@@ -287,28 +355,18 @@ class UploadController extends Controller
 
                             if (!file_exists($chunkFullPath)) {
                                 fclose($out);
-                                // Clean up partial output
-                                if (file_exists($fullOutputPath)) {
-                                    unlink($fullOutputPath);
-                                }
                                 throw new \RuntimeException("Chunk file missing during assembly: {$chunkPath}");
                             }
 
                             $chunkData = file_get_contents($chunkFullPath);
                             if ($chunkData === false) {
                                 fclose($out);
-                                if (file_exists($fullOutputPath)) {
-                                    unlink($fullOutputPath);
-                                }
                                 throw new \RuntimeException("Failed to read chunk: {$chunkPath}");
                             }
 
                             $written = fwrite($out, $chunkData);
                             if ($written === false) {
                                 fclose($out);
-                                if (file_exists($fullOutputPath)) {
-                                    unlink($fullOutputPath);
-                                }
                                 throw new \RuntimeException("Failed to write to output file");
                             }
                             $totalSize += strlen($chunkData);
@@ -319,6 +377,12 @@ class UploadController extends Controller
                         // Detect actual MIME type
                         $mime = $this->detectMimeType($fullOutputPath, $attachmentType);
 
+                        if (!$this->mimeMatchesType($mime, $attachmentType)) {
+                            throw new UploadValidationException(
+                                'File contents do not match the declared type (' . $attachmentType . ')'
+                            );
+                        }
+
                         $assembledFiles[] = [
                             'path'  => $outputPath,
                             'mime'  => $mime,
@@ -327,39 +391,57 @@ class UploadController extends Controller
                     }
                 }
 
-                // Create the Save record (reusing existing pattern from saveFunction)
-                $encryptedContent = Crypt::encryptString($validated['writeup']);
+                // Only the database work runs inside the transaction.
+                $result = \DB::transaction(function () use ($validated, $assembledFiles) {
+                    $encryptedContent = Crypt::encryptString($validated['writeup']);
 
-                [$code, $hashedCode] = $this->allocateUniqueCode();
+                    [$code, $hashedCode] = $this->allocateUniqueCode();
 
-                $save = new Save;
-                $save->writeup    = $encryptedContent;
-                $save->code       = $hashedCode;
-                $save->max_views  = $validated['max_views'] ?? 1;
-                $save->views_count = 0;
-                $save->save();
+                    $save = new Save;
+                    $save->writeup    = $encryptedContent;
+                    $save->code       = $hashedCode;
+                    $save->max_views  = $validated['max_views'] ?? 1;
+                    $save->views_count = 0;
+                    $save->save();
 
-                // Create SaveImage records
-                foreach ($assembledFiles as $file) {
-                    $save->images()->create([
-                        'path'         => $file['path'],
-                        'image_mime'   => $file['mime'],
-                        'size'         => $file['size'],
-                        'is_encrypted' => false,
-                    ]);
-                }
+                    // Create SaveImage records
+                    foreach ($assembledFiles as $file) {
+                        $save->images()->create([
+                            'path'         => $file['path'],
+                            'image_mime'   => $file['mime'],
+                            'size'         => $file['size'],
+                            'is_encrypted' => false,
+                        ]);
+                    }
 
-                // Delete the chunk directory now that assembly is complete
+                    return ['code' => $code];
+                });
+
+                // Post-commit side effects. These must not run before the commit,
+                // otherwise a rollback loses the chunks while the DB is clean.
                 Storage::disk('local')->deleteDirectory('chunks/' . $uploadId);
-
-                // Increment global stats
                 Stats::incrementSaves();
 
                 return response()->json([
                     'status' => 'ok',
-                    'code'   => $code,
+                    'code'   => $result['code'],
                 ]);
-            });
+            } catch (\Throwable $e) {
+                // Remove any output files written before the failure so a
+                // rolled-back upload cannot leak storage.
+                foreach ($writtenPaths as $path) {
+                    if (is_file($path)) {
+                        @unlink($path);
+                    }
+                }
+
+                throw $e;
+            }
+        } catch (UploadValidationException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => $e->getMessage(),
+            ], $e->status());
         } catch (\RuntimeException $e) {
             Log::error('Assembly failed', [
                 'error' => $e->getMessage(),
@@ -369,7 +451,7 @@ class UploadController extends Controller
                 'status'  => 'error',
                 'message' => $e->getMessage(),
             ], 500);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Assembly failed (unexpected)', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -569,5 +651,53 @@ class UploadController extends Controller
         throw new \RuntimeException(
             'Unable to allocate a unique code after ' . $maxAttempts . ' attempts'
         );
+    }
+
+    /**
+     * Canonical extension for a declared attachment type.
+     */
+    private function extensionForType(?string $type): string
+    {
+        return match ($type) {
+            'image' => 'jpg',
+            'pdf' => 'pdf',
+            'mp4' => 'mp4',
+            'zip' => 'zip',
+            default => 'bin',
+        };
+    }
+
+    /**
+     * Server-side size and chunk-count limits per attachment type.
+     *
+     * @return array{max_bytes: int, max_chunks: int}
+     */
+    private function limitsForType(?string $type): array
+    {
+        return match ($type) {
+            'image' => ['max_bytes' => 100 * 1024 * 1024, 'max_chunks' => 50],
+            'pdf'   => ['max_bytes' => 200 * 1024 * 1024, 'max_chunks' => 200],
+            'mp4'   => ['max_bytes' => 500 * 1024 * 1024, 'max_chunks' => 200],
+            'zip'   => ['max_bytes' => 500 * 1024 * 1024, 'max_chunks' => 200],
+            default => ['max_bytes' => 20 * 1024 * 1024, 'max_chunks' => 50],
+        };
+    }
+
+    /**
+     * Whether a detected MIME type is consistent with the declared type.
+     */
+    private function mimeMatchesType(?string $mime, ?string $type): bool
+    {
+        if ($mime === null || $type === null) {
+            return true;
+        }
+
+        return match ($type) {
+            'image' => str_starts_with($mime, 'image/'),
+            'pdf'   => $mime === 'application/pdf',
+            'mp4'   => str_starts_with($mime, 'video/') || $mime === 'application/octet-stream',
+            'zip'   => str_contains($mime, 'zip') || $mime === 'application/octet-stream',
+            default => true,
+        };
     }
 }

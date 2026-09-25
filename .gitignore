@@ -16,6 +16,8 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
-.htaccess
+# Ship the Laravel front-controller rewrite: without public/.htaccess a fresh
+# checkout or image build 404s on every clean URL.
+# .htaccess
 local.yml
 .env.prod

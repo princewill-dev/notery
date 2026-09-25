@@ -16,6 +16,11 @@ use Illuminate\Validation\ValidationException;
 
 class SaveController extends Controller
 {
+    /**
+     * How long a consumed note and its attachments remain downloadable before
+     * the cleanup command purges them.
+     */
+    private const ATTACHMENT_GRACE_MINUTES = 15;
 
     public function home(Request $request)
     {
@@ -44,12 +49,12 @@ class SaveController extends Controller
             $validator = Validator::make($request->all(), [
                 'writeup' => 'required|string',
                 'attachment_type' => 'nullable|in:image,pdf,mp4,zip|required_with:attachment',
-                'attachment' => 'nullable|array|required_with:attachment_type',
+                'attachment' => 'nullable|array|max:20|required_with:attachment_type',
                 'attachment.*' => 'file',
                 'max_views' => 'nullable|integer|min:1|max:100',
             ]);
 
-            $validator->sometimes('attachment.*', 'image|max:102400', function ($input) {
+            $validator->sometimes('attachment.*', 'mimes:jpg,jpeg,png,gif,webp|max:102400', function ($input) {
                 return $input->attachment_type === 'image';
             });
             $validator->sometimes('attachment.*', 'mimes:pdf|max:204800', function ($input) {
@@ -148,17 +153,28 @@ class SaveController extends Controller
                 $maxViews = $lockedData->max_views;
                 $currentViews = $lockedData->views_count ?? 0;
 
-                // Check if already exceeded BEFORE incrementing
-                if ($maxViews !== null && $currentViews >= $maxViews) {
-                    // Already at or over limit - delete and show error
-                    foreach ($lockedData->images as $img) {
-                        if (!empty($img->path) && Storage::exists($img->path)) {
-                            Storage::delete($img->path);
-                        }
-                        $img->delete();
-                    }
-                    $lockedData->delete();
-                    
+                // A consumed note stays in place during a short grace period so
+                // the viewer's signed download links keep working; only purge
+                // once that window has passed.
+                $graceExpired = $lockedData->delete_after !== null
+                    && $lockedData->delete_after->isPast();
+
+                // Legacy rows (consumed before the grace column existed) have no
+                // delete_after, so purge them on the next attempt as before.
+                $legacyConsumed = $lockedData->delete_after === null
+                    && $maxViews !== null
+                    && $currentViews >= $maxViews;
+
+                if ($graceExpired || $legacyConsumed) {
+                    $this->purgeSave($lockedData);
+
+                    $errorMessage = 'This note has reached its view limit and is no longer available';
+                    session()->flash('errorMessage', $errorMessage);
+                    return view('error', compact('errorMessage'));
+                }
+
+                if ($lockedData->delete_after !== null) {
+                    // Consumed but still inside the download grace period.
                     $errorMessage = 'This note has reached its view limit and is no longer available';
                     session()->flash('errorMessage', $errorMessage);
                     return view('error', compact('errorMessage'));
@@ -212,20 +228,15 @@ class SaveController extends Controller
                 // Increment the decodes counter for every successful view
                 Stats::incrementDecodes();
 
-                // Render the note before potentially deleting it
+                // Render the note. We deliberately do NOT delete the note or its
+                // attachments here: this response contains signed download links
+                // that the viewer still needs. Instead mark the note unreachable
+                // and let the scheduled cleanup purge it after the grace period.
                 $response = view('show', compact('decryptedText', 'attachments', 'remainingViews', 'maxViews'));
 
-                // Delete if this was the final view
                 if ($maxViews !== null && $newViewCount >= $maxViews) {
-                    // Delete attachments from storage
-                    foreach ($lockedData->images as $img) {
-                        if (!empty($img->path) && Storage::exists($img->path)) {
-                            Storage::delete($img->path);
-                        }
-                        $img->delete();
-                    }
-                    // Delete the save record itself
-                    $lockedData->delete();
+                    $lockedData->delete_after = now()->addMinutes(self::ATTACHMENT_GRACE_MINUTES);
+                    $lockedData->save();
                 }
 
                 return $response;
@@ -280,5 +291,20 @@ class SaveController extends Controller
         throw new \RuntimeException(
             'Unable to allocate a unique code after ' . $maxAttempts . ' attempts'
         );
+    }
+
+    /**
+     * Delete a note's attachment files/rows and then the note itself.
+     */
+    private function purgeSave(Save $save): void
+    {
+        foreach ($save->images as $img) {
+            if (!empty($img->path) && Storage::exists($img->path)) {
+                Storage::delete($img->path);
+            }
+            $img->delete();
+        }
+
+        $save->delete();
     }
 }

@@ -12,11 +12,18 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Run cleanup every hour to delete saves older than 3 hours
-        $schedule->command('saves:cleanup')->hourly();
+        // Purge notes past the 3h TTL and consumed notes past their short
+        // post-view download grace period. Runs frequently so consumed notes
+        // do not linger; withoutOverlapping prevents concurrent runs.
+        $schedule->command('saves:cleanup')
+            ->everyFiveMinutes()
+            ->withoutOverlapping();
 
-        // Clean up abandoned chunk upload directories older than 24 hours
-        $schedule->command('saves:clean-chunks')->daily();
+        // Reap abandoned chunk upload directories. The command itself only
+        // deletes directories older than 24 hours.
+        $schedule->command('saves:clean-chunks')
+            ->hourly()
+            ->withoutOverlapping();
     }
 
     /**
