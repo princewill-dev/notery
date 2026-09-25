@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class SaveController extends Controller
 {
@@ -27,23 +28,16 @@ class SaveController extends Controller
     }
 
     public function saveFunction(Request $request) {
-        // This function generates a unique 4-digit code
-        function generateRandomString($length = 4){
-            $a = '1234567890';
-            $characterLength = strlen($a);
-            $randomString = '';
-            for($i = 0; $i < $length; $i++){
-                $randomString .= $a[rand(0, $characterLength - 1)];
-            }
-            return $randomString;
+        // Allocate a code that is unique across notes and portals, with a hard
+        // attempt cap so a saturated keyspace cannot pin a PHP worker.
+        try {
+            [$code, $hashedCode] = $this->allocateUniqueCode();
+        } catch (\RuntimeException $e) {
+            Log::error('Code allocation failed on save', ['error' => $e->getMessage()]);
+            throw ValidationException::withMessages([
+                'writeup' => 'We could not allocate a code right now. Please try again in a moment.',
+            ]);
         }
-
-        // Ensure the generated code is unique
-        do {
-            $code = generateRandomString();
-            $hashedCode = hash('sha256', $code);
-            $existingCode = Save::where('code', $hashedCode)->first();
-        } while ($existingCode);
 
         // Validate the submitted data: write-up required, optional attachment and optional max_views
         try {
@@ -246,4 +240,45 @@ class SaveController extends Controller
     
 
 
+
+    /**
+     * Generate a random numeric code using a CSPRNG.
+     */
+    private function generateCode(int $length = 4): string
+    {
+        $chars = '1234567890';
+        $max = strlen($chars) - 1;
+        $code = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $code .= $chars[random_int(0, $max)];
+        }
+
+        return $code;
+    }
+
+    /**
+     * Allocate a code that is unique across both the saves and portal_sessions
+     * tables (they share the same 4-digit namespace), with a bounded retry loop.
+     *
+     * @return array{0: string, 1: string} [plain code, sha256 hash]
+     */
+    private function allocateUniqueCode(int $maxAttempts = 50): array
+    {
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $code = $this->generateCode();
+            $hashedCode = hash('sha256', $code);
+
+            $taken = Save::where('code', $hashedCode)->exists()
+                || PortalSession::where('code', $hashedCode)->exists();
+
+            if (!$taken) {
+                return [$code, $hashedCode];
+            }
+        }
+
+        throw new \RuntimeException(
+            'Unable to allocate a unique code after ' . $maxAttempts . ' attempts'
+        );
+    }
 }

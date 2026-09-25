@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Save;
 use App\Models\SaveImage;
 use App\Models\Stats;
+use App\Models\PortalSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -329,19 +330,13 @@ class UploadController extends Controller
                 // Create the Save record (reusing existing pattern from saveFunction)
                 $encryptedContent = Crypt::encryptString($validated['writeup']);
 
+                [$code, $hashedCode] = $this->allocateUniqueCode();
+
                 $save = new Save;
                 $save->writeup    = $encryptedContent;
-                $save->code       = hash('sha256', 'temp'); // placeholder — will use the code from the frontend
+                $save->code       = $hashedCode;
                 $save->max_views  = $validated['max_views'] ?? 1;
                 $save->views_count = 0;
-                // Actually, we need a unique code. Generate it here so the old flow works.
-                // Reuse the same code generation from SaveController.
-                do {
-                    $code = $this->generateCode();
-                    $hashedCode = hash('sha256', $code);
-                } while (Save::where('code', $hashedCode)->exists());
-
-                $save->code = $hashedCode;
                 $save->save();
 
                 // Create SaveImage records
@@ -549,5 +544,30 @@ class UploadController extends Controller
             $randomString .= $chars[random_int(0, $charLength - 1)];
         }
         return $randomString;
+    }
+
+    /**
+     * Allocate a code that is unique across both saves and portal_sessions,
+     * with a bounded retry loop so a saturated keyspace cannot hang a worker.
+     *
+     * @return array{0: string, 1: string} [plain code, sha256 hash]
+     */
+    private function allocateUniqueCode(int $maxAttempts = 50): array
+    {
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $code = $this->generateCode();
+            $hashedCode = hash('sha256', $code);
+
+            $taken = Save::where('code', $hashedCode)->exists()
+                || PortalSession::where('code', $hashedCode)->exists();
+
+            if (!$taken) {
+                return [$code, $hashedCode];
+            }
+        }
+
+        throw new \RuntimeException(
+            'Unable to allocate a unique code after ' . $maxAttempts . ' attempts'
+        );
     }
 }

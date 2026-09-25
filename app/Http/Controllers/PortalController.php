@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PortalSession;
 use App\Models\PortalMessage;
+use App\Models\Save;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -35,7 +36,17 @@ class PortalController extends Controller
 
         $duration = (int) $request->input('duration');
 
-        $code = $this->generateUniqueCode();
+        try {
+            $code = $this->generateUniqueCode();
+        } catch (\RuntimeException $e) {
+            Log::error('Portal code allocation failed', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No portal codes are available right now. Please try again shortly.',
+            ], 503);
+        }
+
         $hashedCode = hash('sha256', $code);
 
         $peerId = Str::uuid()->toString();
@@ -45,13 +56,15 @@ class PortalController extends Controller
             'duration_minutes' => $duration,
             'expires_at' => now()->addMinutes($duration),
             'status' => 'active',
-            'peer_ids' => [],
+            // Register the creator's peer slot up front so it is reserved and
+            // reused when they open /p/{code} (instead of being discarded).
+            'peer_ids' => [$peerId],
         ]);
 
         $request->session()->put('portal_peer_' . $code, $peerId);
         $request->session()->save();
 
-        Log::info('Portal created', ['code' => $code, 'peer_id' => $peerId, 'session_id' => $request->session()->getId()]);
+        Log::info('Portal created', ['duration' => $duration, 'session_id' => $request->session()->getId()]);
 
         return response()->json([
             'status' => 'ok',
@@ -766,20 +779,30 @@ class PortalController extends Controller
             ?? $request->input('peer_id');
     }
 
-    private function generateUniqueCode(int $length = 4): string
+    private function generateUniqueCode(int $length = 4, int $maxAttempts = 50): string
     {
         $chars = '1234567890';
         $charLength = strlen($chars);
 
-        do {
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
             $randomString = '';
             for ($i = 0; $i < $length; $i++) {
                 $randomString .= $chars[random_int(0, $charLength - 1)];
             }
             $hashedCode = hash('sha256', $randomString);
-        } while (PortalSession::where('code', $hashedCode)->exists());
 
-        return $randomString;
+            // Codes are shared with the saves table, so check both namespaces.
+            $taken = PortalSession::where('code', $hashedCode)->exists()
+                || Save::where('code', $hashedCode)->exists();
+
+            if (!$taken) {
+                return $randomString;
+            }
+        }
+
+        throw new \RuntimeException(
+            'Unable to allocate a unique portal code after ' . $maxAttempts . ' attempts'
+        );
     }
 
     private function chunkDir(string $uploadId): string
