@@ -88,9 +88,7 @@ service cron start\n\
 apache2-foreground' > /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
 
 # Safe production defaults; the platform's environment can override these.
-ENV APP_ENV=production \
-    APP_DEBUG=false \
-    LOG_CHANNEL=daily
+ENV APP_ENV=production APP_DEBUG=false LOG_CHANNEL=daily
 
 EXPOSE 80
 

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\UploadValidationException;
+use App\Support\EncryptedFile;
+use App\Support\EncryptedFileWriter;
 use App\Models\PortalSession;
 use App\Models\PortalMessage;
 use App\Models\Save;
@@ -238,7 +240,7 @@ class PortalController extends Controller
             ];
 
             if ($msg->type === 'text') {
-                $data['content'] = $msg->content;
+                $data['content'] = $this->decryptContent($msg->content, (bool) $msg->is_encrypted);
             } else            if ($msg->type === 'file' || $msg->type === 'image') {
                 $data['file_name'] = $msg->file_name;
                 $data['image_path'] = $msg->image_path;
@@ -260,12 +262,6 @@ class PortalController extends Controller
 
             return $data;
         })->values()->toArray();
-
-        Log::info('Portal poll: success', [
-            'code' => $code,
-            'peer_count' => $peerCount,
-            'message_count' => count($messages),
-        ]);
 
         return response()->json([
             'status' => 'active',
@@ -303,7 +299,8 @@ class PortalController extends Controller
 
             $message = $session->messages()->create([
                 'type' => 'text',
-                'content' => $request->input('content'),
+                'content' => Crypt::encryptString($request->input('content')),
+                'is_encrypted' => true,
                 'peer_id' => $peerId,
                 'created_at' => now(),
             ]);
@@ -386,7 +383,16 @@ class PortalController extends Controller
         $ext = $this->safeExtension($mime);
 
         $filename = Str::uuid()->toString() . '.' . $ext;
-        $path = $file->storeAs('notery', $filename);
+
+        // Stage the plaintext, encrypt into the final path, then drop it.
+        $plainPath = $file->storeAs('notery_tmp', $filename);
+        $path = 'notery/' . $filename;
+
+        EncryptedFile::encryptFile(
+            Storage::disk('local')->path($plainPath),
+            Storage::disk('local')->path($path)
+        );
+        Storage::disk('local')->delete($plainPath);
 
         $message = $session->messages()->create([
             'type' => $messageType,
@@ -394,6 +400,7 @@ class PortalController extends Controller
             'image_path' => $path,
             'image_mime' => $mime,
             'image_size' => $file->getSize(),
+            'is_encrypted' => true,
             'peer_id' => $peerId,
             'created_at' => now(),
         ]);
@@ -546,7 +553,6 @@ class PortalController extends Controller
         } catch (\Exception $e) {
             Log::error('Portal chunk upload failed', [
                 'error' => $e->getMessage(),
-                'code' => $code,
             ]);
             return response()->json([
                 'status' => 'error',
@@ -685,36 +691,40 @@ class PortalController extends Controller
 
                         $writtenPaths[] = $fullOutputPath;
 
-                        $out = fopen($fullOutputPath, 'wb');
-                        if ($out === false) {
-                            throw new \RuntimeException("Failed to open output file: {$fullOutputPath}");
-                        }
+                        // Stream the chunks through the encrypting writer so
+                        // the file is never stored in plaintext.
+                        $writer = new EncryptedFileWriter($fullOutputPath);
 
                         $totalSize = 0;
-                        for ($ci = 0; $ci < $totalChunks; $ci++) {
-                            $cp = 'chunks/' . $uploadId . '/' . $fileIndex . '_' . $ci;
-                            $cfp = Storage::disk('local')->path($cp);
+                        $header = '';
 
-                            if (!file_exists($cfp)) {
-                                fclose($out);
-                                throw new \RuntimeException("Chunk file missing: {$cp}");
+                        try {
+                            for ($ci = 0; $ci < $totalChunks; $ci++) {
+                                $cp = 'chunks/' . $uploadId . '/' . $fileIndex . '_' . $ci;
+                                $cfp = Storage::disk('local')->path($cp);
+
+                                if (!file_exists($cfp)) {
+                                    throw new \RuntimeException("Chunk file missing: {$cp}");
+                                }
+
+                                $chunkData = file_get_contents($cfp);
+                                if ($chunkData === false) {
+                                    throw new \RuntimeException("Failed to read chunk: {$cp}");
+                                }
+
+                                if (strlen($header) < 12) {
+                                    $header .= substr($chunkData, 0, 12 - strlen($header));
+                                }
+
+                                $writer->write($chunkData);
+                                $totalSize += strlen($chunkData);
                             }
 
-                            $chunkData = file_get_contents($cfp);
-                            if ($chunkData === false) {
-                                fclose($out);
-                                throw new \RuntimeException("Failed to read chunk: {$cp}");
-                            }
-
-                            $written = fwrite($out, $chunkData);
-                            if ($written === false) {
-                                fclose($out);
-                                throw new \RuntimeException("Failed to write to output file");
-                            }
-                            $totalSize += strlen($chunkData);
+                            $writer->close();
+                        } catch (\Throwable $e) {
+                            $writer->abort();
+                            throw $e;
                         }
-
-                        fclose($out);
 
                         $limits = $this->limitsForType($attachmentType);
                         if ($totalSize > $limits['max_bytes']) {
@@ -724,7 +734,7 @@ class PortalController extends Controller
                             );
                         }
 
-                        $mime = $this->detectMimeType($fullOutputPath, $attachmentType);
+                        $mime = $this->detectMimeFromBuffer($header, $attachmentType);
 
                         if (!$this->mimeMatchesType($mime, $attachmentType)) {
                             throw new UploadValidationException(
@@ -733,7 +743,6 @@ class PortalController extends Controller
                         }
 
                         if ($attachmentType !== null) {
-                            $header = (string) file_get_contents($fullOutputPath, false, null, 0, 12);
                             $magicError = $this->validateMagicBytes($attachmentType, $header);
                             if ($magicError !== null) {
                                 throw new UploadValidationException($magicError);
@@ -758,6 +767,7 @@ class PortalController extends Controller
                             'image_path' => $file['path'],
                             'image_mime' => $file['mime'],
                             'image_size' => $file['size'],
+                            'is_encrypted' => true,
                             'peer_id' => $peerId,
                             'created_at' => now(),
                         ]);
@@ -831,14 +841,24 @@ class PortalController extends Controller
             'image/webp',
         ], true);
 
-        return response()->file(
-            Storage::path($message->image_path),
+        $sourcePath = Storage::path($message->image_path);
+        $deleteAfterSend = false;
+
+        if ($message->is_encrypted && EncryptedFile::isEncrypted($sourcePath)) {
+            $sourcePath = EncryptedFile::decryptToTemp($sourcePath);
+            $deleteAfterSend = true;
+        }
+
+        $response = response()->file(
+            $sourcePath,
             [
                 'Content-Type' => $message->image_mime ?? 'application/octet-stream',
                 'Content-Disposition' => ($inlineSafe ? 'inline' : 'attachment') . '; filename="portal-file-' . $message->id . '"',
                 'X-Content-Type-Options' => 'nosniff',
             ]
         );
+
+        return $deleteAfterSend ? $response->deleteFileAfterSend(true) : $response;
     }
 
     public function forceDownload(Request $request, $code, $messageId)
@@ -867,6 +887,17 @@ class PortalController extends Controller
         $downloadName = $this->sanitizeFileName(
             $message->file_name ?? ('portal-file-' . $message->id)
         );
+
+        $sourcePath = Storage::path($message->image_path);
+
+        if ($message->is_encrypted && EncryptedFile::isEncrypted($sourcePath)) {
+            $tmp = EncryptedFile::decryptToTemp($sourcePath);
+
+            return response()->download($tmp, $downloadName, [
+                'Content-Type' => $message->image_mime ?? 'application/octet-stream',
+                'X-Content-Type-Options' => 'nosniff',
+            ])->deleteFileAfterSend(true);
+        }
 
         return Storage::download(
             $message->image_path,
@@ -1181,5 +1212,46 @@ class PortalController extends Controller
             'zip'   => str_contains($mime, 'zip') || $mime === 'application/octet-stream',
             default => true,
         };
+    }
+
+    /**
+     * Decrypt a message body, tolerating legacy plaintext rows.
+     */
+    private function decryptContent(?string $content, bool $encrypted): ?string
+    {
+        if ($content === null) {
+            return null;
+        }
+
+        if (!$encrypted) {
+            return $content;
+        }
+
+        try {
+            return Crypt::decryptString($content);
+        } catch (\Throwable $e) {
+            // Row predates encryption or was written by an older build.
+            return $content;
+        }
+    }
+
+    /**
+     * Detect a MIME type from an in-memory header (used because assembled
+     * files are encrypted on disk and cannot be inspected with finfo_file).
+     */
+    private function detectMimeFromBuffer(string $bytes, ?string $attachmentType): string
+    {
+        if ($bytes !== '' && function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo !== false) {
+                $detected = finfo_buffer($finfo, $bytes);
+                finfo_close($finfo);
+                if (is_string($detected) && $detected !== '' && $detected !== 'application/octet-stream') {
+                    return $detected;
+                }
+            }
+        }
+
+        return $this->fallbackExtension($attachmentType);
     }
 }

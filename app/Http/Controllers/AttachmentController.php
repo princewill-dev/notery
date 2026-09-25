@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SaveImage;
+use App\Support\EncryptedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Response;
@@ -67,13 +68,27 @@ class AttachmentController extends Controller
             }
             
             if ($img->is_encrypted) {
-                // Encrypted files: decrypt and serve
+                $fullPath = Storage::path($img->path);
+
+                // New streaming format: decrypt to a temp file and stream it.
+                if (EncryptedFile::isEncrypted($fullPath)) {
+                    $tmp = EncryptedFile::decryptToTemp($fullPath);
+
+                    return response()->file($tmp, [
+                        'Content-Type' => $mime,
+                        'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                        'X-Content-Type-Options' => 'nosniff',
+                    ])->deleteFileAfterSend(true);
+                }
+
+                // Legacy format: Crypt::encryptString() output stored on disk.
                 $encrypted = Storage::get($img->path);
                 $raw = Crypt::decryptString($encrypted);
                 return Response::make($raw, 200, [
                     'Content-Type' => $mime,
                     'Content-Disposition' => 'attachment; filename="' . $filename . '"',
                     'Content-Length' => (string)strlen($raw),
+                    'X-Content-Type-Options' => 'nosniff',
                 ]);
             } else {
                 // Unencrypted files: use response()->file() for better streaming
@@ -86,25 +101,34 @@ class AttachmentController extends Controller
                 return response()->file($fullPath, [
                     'Content-Type' => $mime,
                     'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                    'X-Content-Type-Options' => 'nosniff',
                 ]);
             }
         } else {
-            // Legacy DB blob fallback (always encrypted)
+            // Legacy DB blob fallback (always encrypted).
+            if (empty($img->image)) {
+                abort(404, 'File not found');
+            }
+
             $base64 = Crypt::decryptString($img->image);
-            $raw = base64_decode($base64, true) ?: '';
+            $raw = base64_decode($base64, true);
+            if ($raw === false) {
+                abort(500, 'Stored attachment is corrupt');
+            }
+
             return Response::make($raw, 200, [
                 'Content-Type' => $mime,
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
                 'Content-Length' => (string)strlen($raw),
+                'X-Content-Type-Options' => 'nosniff',
             ]);
         }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Attachment download failed', [
                 'id' => $id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
-            abort(500, 'Download failed: ' . $e->getMessage());
+            abort(500, 'Download failed');
         }
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PortalSession;
 use App\Models\Save;
 use App\Models\Stats;
+use App\Support\EncryptedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -87,16 +88,30 @@ class SaveController extends Controller
         $contentdata->save();
 
         if ($request->hasFile('attachment')) {
+            $attachmentType = $validateData['attachment_type'] ?? null;
+
             foreach ($request->file('attachment') as $attachment) {
                 if ($attachment && $attachment->isValid()) {
                     $mime = $attachment->getMimeType();
-                    $filename = Str::uuid()->toString() . '.' . $attachment->getClientOriginalExtension();
-                    $path = $attachment->storeAs('notery', $filename);
+                    $ext = $this->extensionForMime($mime, $attachmentType);
+                    $filename = Str::uuid()->toString() . '.' . $ext;
+
+                    // Store plaintext in a staging directory, encrypt into the
+                    // final path, then remove the plaintext copy.
+                    $plainPath = $attachment->storeAs('notery_tmp', $filename);
+                    $encPath = 'notery/' . $filename;
+
+                    EncryptedFile::encryptFile(
+                        Storage::disk('local')->path($plainPath),
+                        Storage::disk('local')->path($encPath)
+                    );
+                    Storage::disk('local')->delete($plainPath);
+
                     $contentdata->images()->create([
-                        'path' => $path,
+                        'path' => $encPath,
                         'image_mime' => $mime,
                         'size' => $attachment->getSize(),
-                        'is_encrypted' => false,
+                        'is_encrypted' => true,
                     ]);
                 }
             }
@@ -306,5 +321,29 @@ class SaveController extends Controller
         }
 
         $save->delete();
+    }
+
+    /**
+     * Allowlisted extension for a detected MIME type, falling back to the
+     * declared attachment type. The client filename is never used.
+     */
+    private function extensionForMime(?string $mime, ?string $type): string
+    {
+        return match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'application/pdf' => 'pdf',
+            'video/mp4' => 'mp4',
+            'application/zip', 'application/x-zip-compressed', 'application/x-zip' => 'zip',
+            default => match ($type) {
+                'image' => 'jpg',
+                'pdf' => 'pdf',
+                'mp4' => 'mp4',
+                'zip' => 'zip',
+                default => 'bin',
+            },
+        };
     }
 }

@@ -7,6 +7,7 @@ use App\Models\SaveImage;
 use App\Models\Stats;
 use App\Models\PortalSession;
 use App\Exceptions\UploadValidationException;
+use App\Support\EncryptedFileWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -342,40 +343,45 @@ class UploadController extends Controller
                         // failure still cleans up the partial file.
                         $writtenPaths[] = $fullOutputPath;
 
-                        // Stream-assemble chunks into the final file
-                        $out = fopen($fullOutputPath, 'wb');
-                        if ($out === false) {
-                            throw new \RuntimeException("Failed to open output file: {$fullOutputPath}");
-                        }
+                        // Stream-assemble the chunks, encrypting each frame as
+                        // it is written, so the attachment is never stored in
+                        // plaintext.
+                        $writer = new EncryptedFileWriter($fullOutputPath);
 
                         $totalSize = 0;
-                        for ($chunkIndex = 0; $chunkIndex < $totalChunks; $chunkIndex++) {
-                            $chunkPath = $this->chunkDir($uploadId) . '/' . $fileIndex . '_' . $chunkIndex;
-                            $chunkFullPath = Storage::disk('local')->path($chunkPath);
+                        $header = '';
 
-                            if (!file_exists($chunkFullPath)) {
-                                fclose($out);
-                                throw new \RuntimeException("Chunk file missing during assembly: {$chunkPath}");
+                        try {
+                            for ($chunkIndex = 0; $chunkIndex < $totalChunks; $chunkIndex++) {
+                                $chunkPath = $this->chunkDir($uploadId) . '/' . $fileIndex . '_' . $chunkIndex;
+                                $chunkFullPath = Storage::disk('local')->path($chunkPath);
+
+                                if (!file_exists($chunkFullPath)) {
+                                    throw new \RuntimeException("Chunk file missing during assembly: {$chunkPath}");
+                                }
+
+                                $chunkData = file_get_contents($chunkFullPath);
+                                if ($chunkData === false) {
+                                    throw new \RuntimeException("Failed to read chunk: {$chunkPath}");
+                                }
+
+                                if (strlen($header) < 12) {
+                                    $header .= substr($chunkData, 0, 12 - strlen($header));
+                                }
+
+                                $writer->write($chunkData);
+                                $totalSize += strlen($chunkData);
                             }
 
-                            $chunkData = file_get_contents($chunkFullPath);
-                            if ($chunkData === false) {
-                                fclose($out);
-                                throw new \RuntimeException("Failed to read chunk: {$chunkPath}");
-                            }
-
-                            $written = fwrite($out, $chunkData);
-                            if ($written === false) {
-                                fclose($out);
-                                throw new \RuntimeException("Failed to write to output file");
-                            }
-                            $totalSize += strlen($chunkData);
+                            $writer->close();
+                        } catch (\Throwable $e) {
+                            $writer->abort();
+                            throw $e;
                         }
 
-                        fclose($out);
-
-                        // Detect actual MIME type
-                        $mime = $this->detectMimeType($fullOutputPath, $attachmentType);
+                        // Detect the MIME type from the plaintext header we
+                        // captured while assembling.
+                        $mime = $this->detectMimeFromBuffer($header, $attachmentType);
 
                         if (!$this->mimeMatchesType($mime, $attachmentType)) {
                             throw new UploadValidationException(
@@ -410,7 +416,7 @@ class UploadController extends Controller
                             'path'         => $file['path'],
                             'image_mime'   => $file['mime'],
                             'size'         => $file['size'],
-                            'is_encrypted' => false,
+                            'is_encrypted' => true,
                         ]);
                     }
 
@@ -699,5 +705,25 @@ class UploadController extends Controller
             'zip'   => str_contains($mime, 'zip') || $mime === 'application/octet-stream',
             default => true,
         };
+    }
+
+    /**
+     * Detect a MIME type from an in-memory header (used when the assembled
+     * file is encrypted on disk and cannot be inspected with finfo_file).
+     */
+    private function detectMimeFromBuffer(string $bytes, ?string $attachmentType): string
+    {
+        if ($bytes !== '' && function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo !== false) {
+                $detected = finfo_buffer($finfo, $bytes);
+                finfo_close($finfo);
+                if (is_string($detected) && $detected !== '' && $detected !== 'application/octet-stream') {
+                    return $detected;
+                }
+            }
+        }
+
+        return $this->fallbackExtension($attachmentType);
     }
 }
