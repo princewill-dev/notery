@@ -21,3 +21,5 @@ yarn-error.log
 # .htaccess
 local.yml
 .env.prod
+# macOS
+.DS_Store
