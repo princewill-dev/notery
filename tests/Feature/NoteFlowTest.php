@@ -84,7 +84,7 @@ class NoteFlowTest extends TestCase
             'is_encrypted' => false,
         ]);
 
-        $this->get('/8765')->assertStatus(200)->assertSee('no longer available');
+        $this->get('/8765')->assertStatus(410)->assertSee('no longer available');
 
         $this->assertDatabaseMissing('saves', ['id' => $save->id]);
         $this->assertDatabaseMissing('save_images', ['save_id' => $save->id]);

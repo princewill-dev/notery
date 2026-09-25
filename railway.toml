@@ -1,3 +1,8 @@
-[nixpacks.env]
-NIXPACKS_PHP_INI_PATH = "php/conf.d/uploads.ini"
-PHP_VERSION = "8.3"
+# Deployment uses the repository Dockerfile (self-contained multi-stage build),
+# which sets the document root to /public, installs php/conf.d/uploads.ini, and
+# runs composer/npm during the build.
+#
+# The previous [nixpacks.env] table is not a documented Railway/Nixpacks schema,
+# so it was removed. If Nixpacks is ever used instead of the Dockerfile, set
+# NIXPACKS_PHP_ROOT_DIR=/app/public in the Railway dashboard, otherwise the
+# server root defaults to the repo root and can expose .env and storage/.

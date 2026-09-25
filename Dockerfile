@@ -52,12 +52,16 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
     && a2enmod rewrite
 
 # Directory listings are disabled; the committed public/.htaccess provides the
-# front-controller rewrite.
+# front-controller rewrite. Dotfiles (except .well-known) are denied so
+# .user.ini/.htaccess are never served.
 RUN echo '<Directory /var/www/html/public>\n\
     Options -Indexes +FollowSymLinks\n\
     AllowOverride All\n\
     Require all granted\n\
-</Directory>' >> /etc/apache2/apache2.conf
+</Directory>\n\
+<FilesMatch "^[.](?!well-known)">\n\
+    Require all denied\n\
+</FilesMatch>' >> /etc/apache2/apache2.conf
 
 # 3. Install Composer and PHP limits
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

@@ -158,7 +158,7 @@ class SaveController extends Controller
                 if (!$lockedData) {
                     $errorMessage = 'Invalid code';
                     session()->flash('errorMessage', $errorMessage);
-                    return view('error', compact('errorMessage'));
+                    return response()->view('error', compact('errorMessage'), 404);
                 }
 
                 $maxViews = $lockedData->max_views;
@@ -181,14 +181,14 @@ class SaveController extends Controller
 
                     $errorMessage = 'This note has reached its view limit and is no longer available';
                     session()->flash('errorMessage', $errorMessage);
-                    return view('error', compact('errorMessage'));
+                    return response()->view('error', compact('errorMessage'), 410);
                 }
 
                 if ($lockedData->delete_after !== null) {
                     // Consumed but still inside the download grace period.
                     $errorMessage = 'This note has reached its view limit and is no longer available';
                     session()->flash('errorMessage', $errorMessage);
-                    return view('error', compact('errorMessage'));
+                    return response()->view('error', compact('errorMessage'), 410);
                 }
 
                 // Atomically increment the view count in the database
@@ -201,7 +201,7 @@ class SaveController extends Controller
                 } catch (\Exception $e) {
                     $errorMessage = 'Invalid code';
                     session()->flash('errorMessage', $errorMessage);
-                    return view('error', compact('errorMessage'));
+                    return response()->view('error', compact('errorMessage'), 404);
                 }
 
                 // Prepare attachments as signed download URLs (from DB)
@@ -255,7 +255,7 @@ class SaveController extends Controller
         } else {
             $errorMessage = 'Invalid code';
             $request->session()->flash('errorMessage', $errorMessage);
-            return view('error', compact('errorMessage'));
+            return response()->view('error', compact('errorMessage'), 404);
         }
     }
     

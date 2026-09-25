@@ -68,7 +68,7 @@ class PortalFlowTest extends TestCase
             ],
         ]);
 
-        $this->get('/p/5555')->assertStatus(200)->assertSee('full');
+        $this->get('/p/5555')->assertStatus(409)->assertSee('full');
     }
 
     public function test_idle_peers_are_evicted_and_their_slot_reused(): void
@@ -101,7 +101,7 @@ class PortalFlowTest extends TestCase
             'peer_ids' => [],
         ]);
 
-        $this->get('/p/7777')->assertStatus(200)->assertSee('closed');
+        $this->get('/p/7777')->assertStatus(410)->assertSee('closed');
     }
 
     public function test_a_peer_id_from_the_request_is_not_accepted(): void

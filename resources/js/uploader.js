@@ -68,7 +68,15 @@ class ChunkedUploader {
         const writeup = this.writeupInput ? this.writeupInput.value.trim() : '';
         const attachmentTypeVal = this.attachmentType ? this.attachmentType.value : '';
         const maxViews = this.maxViewsInput ? (this.maxViewsInput.value || null) : null;
-        const files = this.fileInput ? Array.from(this.fileInput.files || []) : [];
+        const selectedFiles = this.fileInput ? Array.from(this.fileInput.files || []) : [];
+
+        // A zero-byte file produces zero chunks, which makes the server report
+        // the whole batch as incomplete. Skip them with a clear message.
+        const files = selectedFiles.filter((file) => file.size > 0);
+
+        if (selectedFiles.length !== files.length) {
+            this.showError('Empty files were skipped.');
+        }
 
         // Client-side validation
         if (!writeup) {

@@ -92,7 +92,7 @@ class PortalController extends Controller
     {
         if (!preg_match('/^\d{4}$/', $code)) {
             $errorMessage = 'Invalid portal code';
-            return view('portal.expired', compact('errorMessage'));
+            return response()->view('portal.expired', compact('errorMessage'), 404);
         }
 
         $hashedCode = hash('sha256', $code);
@@ -100,17 +100,17 @@ class PortalController extends Controller
 
         if (!$session) {
             $errorMessage = 'This portal does not exist';
-            return view('portal.expired', compact('errorMessage'));
+            return response()->view('portal.expired', compact('errorMessage'), 404);
         }
 
         if ($session->status === 'closed') {
             $errorMessage = 'This portal has been closed';
-            return view('portal.expired', compact('errorMessage'));
+            return response()->view('portal.expired', compact('errorMessage'), 410);
         }
 
         if (now()->gt($session->expires_at)) {
             $errorMessage = 'This portal has expired';
-            return view('portal.expired', compact('errorMessage'));
+            return response()->view('portal.expired', compact('errorMessage'), 410);
         }
 
         // Allocate the peer slot atomically. The previous read-then-write had
@@ -157,12 +157,12 @@ class PortalController extends Controller
 
         if ($peerId === null) {
             $errorMessage = 'This portal does not exist';
-            return view('portal.expired', compact('errorMessage'));
+            return response()->view('portal.expired', compact('errorMessage'), 404);
         }
 
         if ($peerId === false) {
             $errorMessage = 'This portal is full (maximum 2 participants)';
-            return view('portal.expired', compact('errorMessage'));
+            return response()->view('portal.expired', compact('errorMessage'), 409);
         }
 
         return view('portal', [

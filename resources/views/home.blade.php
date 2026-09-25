@@ -85,7 +85,7 @@
 </div>
 
 {{-- Find modal --}}
-<div id="findNoteModal" aria-hidden="true" class="notery-hidden notery-modal-overlay">
+<div id="findNoteModal" role="dialog" aria-modal="true" aria-label="Find a note" aria-hidden="true" class="notery-hidden notery-modal-overlay">
   <div id="findNoteModalBackdrop" style="position:absolute;inset:0;"></div>
   <div class="notery-modal" style="position:relative;z-index:1;">
     <div class="notery-modal-header">
@@ -94,7 +94,7 @@
     </div>
     <form action="/" method="GET" class="notery-form">
       <input type="tel" name="code" id="find_code" class="notery-input"
-        inputmode="numeric" pattern="\d{4}" maxlength="4"
+        inputmode="numeric" pattern="\d{4}" maxlength="4" aria-label="4-digit note code"
         placeholder="Enter 4-digit code" required />
       <button type="submit" class="notery-btn notery-btn-primary notery-btn-block">Find note</button>
     </form>
@@ -103,7 +103,7 @@
 
 {{-- Saved modal --}}
 @if(session('saved') && session('code'))
-<div id="savedModal" class="notery-modal-overlay">
+<div id="savedModal" role="dialog" aria-modal="true" aria-label="Note saved" class="notery-modal-overlay">
   <div id="savedModalBackdrop" style="position:absolute;inset:0;"></div>
   <div class="notery-modal notery-text-center" style="position:relative;z-index:1;">
     <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">Note saved</h2>
@@ -121,7 +121,7 @@
 @endif
 
 {{-- Portal create modal --}}
-<div id="portalCreateModal" aria-hidden="true" class="notery-hidden notery-modal-overlay">
+<div id="portalCreateModal" role="dialog" aria-modal="true" aria-label="Create a Portal" aria-hidden="true" class="notery-hidden notery-modal-overlay">
   <div id="portalModalBackdrop" style="position:absolute;inset:0;"></div>
   <div class="notery-modal" style="position:relative;z-index:1;">
     <div class="notery-modal-header">
@@ -155,7 +155,7 @@
 </div>
 
 {{-- Portal created success modal --}}
-<div id="portalCreatedModal" aria-hidden="true" class="notery-hidden notery-modal-overlay">
+<div id="portalCreatedModal" role="dialog" aria-modal="true" aria-label="Portal created" aria-hidden="true" class="notery-hidden notery-modal-overlay">
   <div id="portalCreatedBackdrop" style="position:absolute;inset:0;"></div>
   <div class="notery-modal notery-text-center" style="position:relative;z-index:1;">
     <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;">Portal created</h2>
