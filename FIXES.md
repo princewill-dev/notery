@@ -1,52 +1,75 @@
 # Notery audit remediation tracker
 
 Branch: `fix/security-audit`. Source of findings: `NOTERY_AUDIT.md`.
-
-Legend: [x] done · [~] partial · [ ] pending
+Legend: [x] done · [~] partial/accepted · [ ] pending
 
 ## Critical — done
 
-- [x] **C1** Rate-limit code lookups. Per-IP limiters (`code-lookup`, `code-create`, `portal-poll`, `portal-action`, `upload`) applied to every code-addressed route. `app/Providers/RouteServiceProvider.php`, `routes/web.php`. Commit `48bdb89`.
-- [x] **C2** Bound unique-code generation to 50 attempts with a clean 503/validation error, and allocate across both `saves` and `portal_sessions`. `SaveController`, `UploadController`, `PortalController`. Commit `48bdb89`.
-- [x] **C3** Disable Ignition runnable solutions via `config/ignition.php` (closes `/_ignition/execute-solution` even with `APP_DEBUG=true` + `APP_ENV=local`); add safe `.env.example`. Commit `991088e`.
+- [x] **C1** Per-IP rate limiters on every code-addressed route (`48bdb89`).
+- [x] **C2** Bounded code generation + cross-namespace allocation (`48bdb89`).
+- [x] **C3** Ignition runnable solutions disabled; safe `.env.example` (`991088e`).
 
 ## High — done
 
-- [x] **H1** Quote-safe `escapeHtml` in `portal.js`/`uploader.js` (filename can no longer break out of `alt="..."`); server-side filename sanitization. Commit `85cddb1`.
-- [x] **H2** Reject SVG on both portal paths, serve only raster allowlist inline with `nosniff`, remove SVG from the direct note image rule. Commit `85cddb1`.
-- [x] **H3** Per-type byte and chunk caps, max file count, conflicting `total_chunks` rejection, and MIME/declared-type checks in both chunked flows. `UploadController`, `PortalController`, `UploadValidationException`. Commit `85cddb1`.
-- [x] **H4** Portal poll cursor switched to monotonic message id; client dedupes by id and stops overlapping polls. Commit `85cddb1`.
-- [x] **H5** Note/attachment purge deferred by a 15-minute download grace period (`saves.delete_after`); cleanup handles it and runs every 5 minutes. Commit `85cddb1`.
-- [x] **H6** Note assembly does file IO outside the DB transaction, unlinks partial outputs, and deletes chunks/increments stats only after commit. Commit `85cddb1`.
-- [x] **H7** Peer slots claimed inside a locked transaction; idle peers evicted via `portal_sessions.peer_seen_at`. Commit `85cddb1`.
-- [x] **H8** `public/.htaccess` committed and un-ignored. Commit `85cddb1`.
-- [x] **H9** Self-contained multi-stage Docker image (npm build, `composer install --no-dev`, no bind-mount dependency) + `.dockerignore`; image builds successfully. Commit `e7ee302`.
-- [x] **H10** Streaming AES-256-GCM file encryption (`App\Support\EncryptedFile`) for note and portal attachments; portal text encrypted; remaining code/peer values removed from logs. Commit `c436176`.
+- [x] **H1** Quote-safe escaping / filename sanitization (`85cddb1`).
+- [x] **H2** SVG rejected, raster-only inline, nosniff (`85cddb1`).
+- [x] **H3** Server-side byte/chunk/file caps and MIME checks (`85cddb1`).
+- [x] **H4** Poll cursor by monotonic message id (`85cddb1`).
+- [x] **H5** 15-minute download grace period before purge (`85cddb1`).
+- [x] **H6** File IO outside the DB transaction; partial-output cleanup (`85cddb1`).
+- [x] **H7** Atomic peer-slot claim + idle eviction (`85cddb1`).
+- [x] **H8** `public/.htaccess` committed (`85cddb1`).
+- [x] **H9** Self-contained multi-stage Docker image (`e7ee302`).
+- [x] **H10** Streaming AES-256-GCM encryption for portal text and all attachments (`c436176`).
+
+## Medium — done
+
+- [x] **M1** Session-only peer identity; `is_mine` instead of peer ids (`caeabfa`).
+- [x] **M2** Manifest read-modify-write serialized with a cache lock (`caeabfa`).
+- [x] **M3** Assembled-file MIME/magic validation and `total_chunks` consistency (`85cddb1`, `caeabfa`).
+- [x] **M4** Stored extensions allowlisted from detected MIME (`85cddb1`).
+- [x] **M5** Unique index on `saves.code` + retry on conflict (`caeabfa`).
+- [x] **M6** Signed URLs shortened to 5 min; portal downloads require a live participant (`caeabfa`).
+- [x] **M7** Cleanup runs every 5 minutes with `withoutOverlapping`; Dockerfile cron (`85cddb1`).
+- [x] **M8** Security headers, trusted proxies, production-only TrustHosts (`caeabfa`).
+- [x] **M9** 200-message portal cap (`caeabfa`).
+- [x] **M10** Download filenames sanitized (`c436176`).
+- [x] **M11** Portal assembly transactional, scoped to the portal, chunks deleted after commit (`85cddb1`).
+- [x] **M12** Upload ini limits consolidated at 512M/520M (`caeabfa`).
+- [x] **M13** Database sessions table + `.env.example` default (`caeabfa`).
+- [x] **M14** Empty Vite CSS entry removed; Docker builds assets (`caeabfa`, `e7ee302`).
+- [x] **M15** Dead controllers/views and `/api/user` removed; `QUEUE_CONNECTION=sync` (`caeabfa`, `a549b5e`).
+
+## Low / Info — done or accepted
+
+- [x] **L3** ~12 MB unreferenced assets deleted (`a549b5e`).
+- [x] **L4** Root `index.php` removed (`a549b5e`).
+- [x] **L5** `random_int` for codes; nested function removed (`48bdb89`).
+- [x] **L6** Correct 404/410/409 statuses; internal messages no longer echoed (`a549b5e`, `c436176`).
+- [x] **L7** Zero-byte files skipped client-side (`a549b5e`).
+- [x] **L8** Legacy blob null/corrupt guards (`c436176`).
+- [x] **L10** Directory listings disabled; dotfiles denied (`a549b5e`).
+- [x] **L11** `since`/`last_id` validated (`85cddb1`).
+- [x] **L12** Debug logging and inline placeholder removed (`a549b5e`).
+- [x] **L13** Creator peer slot registered at create time (`48bdb89`).
+- [x] **L14** Dialog roles and input labels added (`a549b5e`).
+- [x] **L15** Undocumented `railway.toml` block removed (`a549b5e`).
+- [x] **L16** SVG validation consistent across both note paths (`85cddb1`).
+- [~] **L1** Stats counters remain written but unread; the `firstOrCreate` race is mitigated by Laravel's `createOrFirst`. Accepted as informational.
+- [~] **L2** Legacy `User` model/factory and Sanctum dependency remain; unused but harmless. Accepted.
+- [~] **L9** Migration-window `is_encrypted` default: left as-is because a legacy `Crypt`-on-disk row cannot be safely distinguished from a plaintext row by content sniffing. The window was one week in October 2025.
 
 ## Verification
 
-- `./vendor/bin/phpunit` → 18 tests, 61 assertions, all passing (note flow, portal flow, upload caps, rate limits, encryption round-trip/tamper).
+- `./vendor/bin/phpunit` → 21 tests, 67 assertions, all passing.
 - `npm run build` → succeeds; committed bundle regenerated.
-- `docker build` → succeeds (multi-stage). Note: older unencrypted `save_images` rows remain readable because the download path falls back to the legacy decrypt; no data migration is required.
+- `docker build` → succeeds (multi-stage).
+- `php artisan route:list` → boots with all middleware registered.
+- Existing plaintext attachments and legacy portal text remain readable via fallbacks; only new writes are encrypted, so no data migration is required.
 
-## Medium — pending
+## Deployment notes
 
-- [ ] **M1** Derive `peer_id` strictly from the session; keep ids out of URLs/logs.
-- [ ] **M2** Lock manifest read-modify-write (or move chunk state to a row).
-- [ ] **M3** Validate magic bytes on the assembled file (done for portal) and require `total_chunks` consistency (done both).
-- [ ] **M4** Allowlist stored extensions (done) — verify no remaining client-extension paths.
-- [ ] **M5** Add a unique index on `saves.code` (allocation now cross-checks; index still missing).
-- [ ] **M6** Bind/shorten/single-use signed URLs; check portal status on download.
-- [ ] **M7** Cleanup now runs every 5 min with `withoutOverlapping`; still needs a supervised scheduler in the deployment.
-- [ ] **M8** `SESSION_SECURE_COOKIE` in `.env.example`; still need trusted proxies, `TrustHosts`, security headers.
-- [ ] **M9** Cap messages per portal; `LOG_CHANNEL=daily` no-op (`stack` hardcoded to `single`).
-- [ ] **M10** Sanitize download filenames (done); verify all download paths.
-- [ ] **M11** Portal assembly is now transactional and scoped; chunk deletion unconditional case reviewed.
-- [ ] **M12** Consolidate conflicting upload ini limits.
-- [ ] **M13** Shared session store for multi-instance deploys.
-- [ ] **M14** Build assets in CI (Docker now builds them); unify the CSS pipeline.
-- [ ] **M15** `QUEUE_CONNECTION=sync` in `.env.example`; delete dead queue/api/auth surface.
-
-## Low / Info — pending
-
-- [ ] **L1–L16** Stats dead data, dead code/assets, root `index.php`, weak PRNG (fixed), error leakage/status codes, client edge cases, accessibility, railway.toml, SVG inconsistency, logging.
+1. Run the new migrations (`2026_09_25_000001` … `000005`). `000004` dedupes any duplicate `saves.code` rows before adding the unique index.
+2. Set `APP_ENV=production`, `APP_DEBUG=false`, and `SESSION_DRIVER=database` on the host (see `.env.example`).
+3. Verify the scheduler is actually running (`saves:cleanup` every 5 minutes).
+4. Consider tuning the code-lookup rate limit (15/min per IP) if users share a NAT/proxy.
