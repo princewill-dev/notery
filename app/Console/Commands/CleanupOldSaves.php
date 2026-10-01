@@ -29,9 +29,18 @@ class CleanupOldSaves extends Command
     public function handle()
     {
         $threeHoursAgo = now()->subHours(3);
-        
-        // Find all saves older than 3 hours
-        $oldSaves = Save::where('created_at', '<', $threeHoursAgo)->with('images')->get();
+
+        // Delete notes older than 3 hours, plus consumed notes whose short
+        // post-view download grace period has elapsed.
+        $oldSaves = Save::where(function ($query) use ($threeHoursAgo) {
+                $query->where('created_at', '<', $threeHoursAgo)
+                    ->orWhere(function ($grace) {
+                        $grace->whereNotNull('delete_after')
+                            ->where('delete_after', '<=', now());
+                    });
+            })
+            ->with('images')
+            ->get();
         
         $deletedCount = 0;
         $deletedFilesCount = 0;

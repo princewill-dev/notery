@@ -11,8 +11,9 @@ use App\Http\Controllers\PortalController;
 //this controls the homepage
 Route::get('/', [SaveController::class, 'home']);
 
-//this save a submitted writeup
-Route::post('/save', [SaveController::class, 'saveFunction']);
+//this save a submitted writeup (rate-limited: creation is unauthenticated)
+Route::post('/save', [SaveController::class, 'saveFunction'])
+    ->middleware('throttle:code-create');
 
 // download attachments (signed)
 Route::get('/attachments/{id}', [AttachmentController::class, 'download'])
@@ -20,23 +21,32 @@ Route::get('/attachments/{id}', [AttachmentController::class, 'download'])
     ->middleware('signed');
 
 // chunked file upload endpoints
-Route::post('/upload/chunk', [UploadController::class, 'storeChunk']);
-Route::post('/upload/assemble', [UploadController::class, 'assemble']);
+Route::post('/upload/chunk', [UploadController::class, 'storeChunk'])
+    ->middleware('throttle:upload');
+Route::post('/upload/assemble', [UploadController::class, 'assemble'])
+    ->middleware('throttle:upload');
 
 // Portal routes
-Route::post('/portal/create', [PortalController::class, 'create']);
+Route::post('/portal/create', [PortalController::class, 'create'])
+    ->middleware('throttle:code-create');
 Route::get('/p/{code}', [PortalController::class, 'show'])
-    ->where('code', '[0-9]{4}');
+    ->where('code', '[0-9]{4}')
+    ->middleware('throttle:code-lookup');
 Route::get('/portal/{code}/poll', [PortalController::class, 'poll'])
-    ->where('code', '[0-9]{4}');
+    ->where('code', '[0-9]{4}')
+    ->middleware('throttle:portal-poll');
 Route::post('/portal/{code}/message', [PortalController::class, 'sendMessage'])
-    ->where('code', '[0-9]{4}');
+    ->where('code', '[0-9]{4}')
+    ->middleware('throttle:portal-action');
 Route::post('/portal/{code}/upload-chunk', [PortalController::class, 'storeChunk'])
-    ->where('code', '[0-9]{4}');
+    ->where('code', '[0-9]{4}')
+    ->middleware('throttle:upload');
 Route::post('/portal/{code}/upload-assemble', [PortalController::class, 'assemble'])
-    ->where('code', '[0-9]{4}');
+    ->where('code', '[0-9]{4}')
+    ->middleware('throttle:upload');
 Route::post('/portal/{code}/close', [PortalController::class, 'close'])
-    ->where('code', '[0-9]{4}');
+    ->where('code', '[0-9]{4}')
+    ->middleware('throttle:portal-action');
 Route::get('/portal/{code}/attachment/{messageId}', [PortalController::class, 'downloadAttachment'])
     ->name('portal.attachment')
     ->middleware('signed')
@@ -48,4 +58,5 @@ Route::get('/portal/{code}/download/{messageId}', [PortalController::class, 'for
 
 //this shows a writeup when a unique code is provided as the first path segment
 Route::get('/{code}', [SaveController::class, 'findWriteup'])
-    ->where('code', '[0-9]{4}');
+    ->where('code', '[0-9]{4}')
+    ->middleware('throttle:code-lookup');

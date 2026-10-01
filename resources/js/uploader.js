@@ -68,7 +68,15 @@ class ChunkedUploader {
         const writeup = this.writeupInput ? this.writeupInput.value.trim() : '';
         const attachmentTypeVal = this.attachmentType ? this.attachmentType.value : '';
         const maxViews = this.maxViewsInput ? (this.maxViewsInput.value || null) : null;
-        const files = this.fileInput ? Array.from(this.fileInput.files || []) : [];
+        const selectedFiles = this.fileInput ? Array.from(this.fileInput.files || []) : [];
+
+        // A zero-byte file produces zero chunks, which makes the server report
+        // the whole batch as incomplete. Skip them with a clear message.
+        const files = selectedFiles.filter((file) => file.size > 0);
+
+        if (selectedFiles.length !== files.length) {
+            this.showError('Empty files were skipped.');
+        }
 
         // Client-side validation
         if (!writeup) {
@@ -447,9 +455,14 @@ class ChunkedUploader {
     }
 
     escapeHtml(str) {
-        const div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
-        return div.innerHTML;
+        // Escape quotes as well as angle brackets: this value is interpolated
+        // into HTML attributes (alt, href) where a bare quote would break out.
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     fallbackUUID() {

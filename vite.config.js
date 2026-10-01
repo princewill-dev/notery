@@ -4,7 +4,10 @@ import laravel from 'laravel-vite-plugin';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js'],
+            // CSS is the hand-maintained public/assets/css/notery.css loaded by
+            // the layout; the previous empty resources/css/app.css entry only
+            // produced a useless manifest row.
+            input: ['resources/js/app.js'],
             refresh: true,
         }),
     ],

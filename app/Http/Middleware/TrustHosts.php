@@ -13,6 +13,12 @@ class TrustHosts extends Middleware
      */
     public function hosts(): array
     {
+        // Only constrain hosts in production; local development and tests use
+        // arbitrary hostnames (localhost, 127.0.0.1, container names).
+        if (!app()->environment('production')) {
+            return ['*'];
+        }
+
         return [
             $this->allSubdomainsOfApplicationUrl(),
         ];

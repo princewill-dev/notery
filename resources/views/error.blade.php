@@ -14,7 +14,7 @@
   <div class="notery-card notery-mb-3">
     <form action="/" method="GET" class="notery-form">
       <input type="text" name="code" class="notery-input" inputmode="numeric"
-        pattern="\d{4}" maxlength="4" placeholder="Enter 4-digit code" required autofocus />
+        pattern="\d{4}" maxlength="4" aria-label="4-digit note code" placeholder="Enter 4-digit code" required autofocus />
       <button type="submit" class="notery-btn notery-btn-primary notery-btn-block">Find note</button>
     </form>
   </div>
