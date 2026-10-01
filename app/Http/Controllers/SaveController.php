@@ -97,11 +97,16 @@ class SaveController extends Controller
                     $plainPath = $attachment->storeAs('notery_tmp', $filename);
                     $encPath = 'notery/' . $filename;
 
-                    EncryptedFile::encryptFile(
-                        Storage::disk('local')->path($plainPath),
-                        Storage::disk('local')->path($encPath)
-                    );
-                    Storage::disk('local')->delete($plainPath);
+                    // Always drop the plaintext staging copy, even if encryption
+                    // fails, so raw bytes cannot linger on disk.
+                    try {
+                        EncryptedFile::encryptFile(
+                            Storage::disk('local')->path($plainPath),
+                            Storage::disk('local')->path($encPath)
+                        );
+                    } finally {
+                        Storage::disk('local')->delete($plainPath);
+                    }
 
                     $contentdata->images()->create([
                         'path' => $encPath,

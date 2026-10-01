@@ -258,7 +258,7 @@ class UploadController extends Controller
             $validator = Validator::make($request->all(), [
                 'upload_id'       => ['required', 'string', 'regex:/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i'],
                 'writeup'         => 'required|string',
-                'attachment_type' => 'nullable|in:' . implode(',', self::ALLOWED_TYPES),
+                'attachment_type' => 'nullable|required_with:files|in:' . implode(',', self::ALLOWED_TYPES),
                 'max_views'       => 'nullable|integer|min:1|max:100',
                 'files'           => 'nullable|array',
                 'files.*.index'   => 'required_with:files|integer|min:0',
@@ -338,6 +338,7 @@ class UploadController extends Controller
             // back.
             $assembledFiles = [];
             $writtenPaths = [];
+            $committed = false;
 
             try {
                 if (!empty($filesMeta)) {
@@ -429,31 +430,39 @@ class UploadController extends Controller
                 $result = \DB::transaction(function () use ($validated, $assembledFiles) {
                     $encryptedContent = Crypt::encryptString($validated['writeup']);
 
-                    // Retry inside a nested transaction (savepoint) so losing a
-                    // code race does not poison the outer transaction.
-                    [$save, $code] = \DB::transaction(function () use ($encryptedContent, $validated) {
-                        $lastException = null;
+                    $lastException = null;
+                    $save = null;
+                    $code = null;
 
-                        for ($attempt = 0; $attempt < 5; $attempt++) {
-                            [$candidate, $hashedCode] = $this->allocateUniqueCode();
+                    // Each attempt runs in its own savepointed transaction so a
+                    // lost code race rolls back cleanly. Catching the unique
+                    // violation outside the transaction is required on
+                    // PostgreSQL, where a failed statement otherwise poisons the
+                    // surrounding transaction.
+                    for ($attempt = 0; $attempt < 5; $attempt++) {
+                        [$candidate, $hashedCode] = $this->allocateUniqueCode();
 
-                            $save = new Save;
-                            $save->writeup    = $encryptedContent;
-                            $save->code       = $hashedCode;
-                            $save->max_views  = $validated['max_views'] ?? 1;
-                            $save->views_count = 0;
-
-                            try {
+                        try {
+                            $save = \DB::transaction(function () use ($encryptedContent, $validated, $hashedCode) {
+                                $save = new Save;
+                                $save->writeup     = $encryptedContent;
+                                $save->code        = $hashedCode;
+                                $save->max_views   = $validated['max_views'] ?? 1;
+                                $save->views_count = 0;
                                 $save->save();
 
-                                return [$save, $candidate];
-                            } catch (UniqueConstraintViolationException $e) {
-                                $lastException = $e;
-                            }
+                                return $save;
+                            });
+                            $code = $candidate;
+                            break;
+                        } catch (UniqueConstraintViolationException $e) {
+                            $lastException = $e;
                         }
+                    }
 
+                    if ($save === null || $code === null) {
                         throw $lastException ?? new \RuntimeException('Unable to allocate a unique code');
-                    });
+                    }
 
                     // Create SaveImage records
                     foreach ($assembledFiles as $file) {
@@ -468,6 +477,10 @@ class UploadController extends Controller
                     return ['code' => $code];
                 });
 
+                // From here on the rows are committed: files must not be
+                // unlinked even if a post-commit side effect fails.
+                $committed = true;
+
                 // Post-commit side effects. These must not run before the commit,
                 // otherwise a rollback loses the chunks while the DB is clean.
                 Storage::disk('local')->deleteDirectory('chunks/' . $uploadId);
@@ -479,10 +492,13 @@ class UploadController extends Controller
                 ]);
             } catch (\Throwable $e) {
                 // Remove any output files written before the failure so a
-                // rolled-back upload cannot leak storage.
-                foreach ($writtenPaths as $path) {
-                    if (is_file($path)) {
-                        @unlink($path);
+                // rolled-back upload cannot leak storage. Once committed, the
+                // rows own these files, so leave them in place.
+                if (!$committed) {
+                    foreach ($writtenPaths as $path) {
+                        if (is_file($path)) {
+                            @unlink($path);
+                        }
                     }
                 }
 
@@ -500,7 +516,7 @@ class UploadController extends Controller
             ]);
             return response()->json([
                 'status'  => 'error',
-                'message' => $e->getMessage(),
+                'message' => 'Assembly failed',
             ], 500);
         } catch (\Throwable $e) {
             Log::error('Assembly failed (unexpected)', [

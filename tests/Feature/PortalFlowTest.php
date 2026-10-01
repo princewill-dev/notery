@@ -51,6 +51,27 @@ class PortalFlowTest extends TestCase
             ->assertJson(['status' => 'ok']);
     }
 
+    public function test_the_creator_reuses_the_reserved_slot_and_a_third_peer_is_rejected(): void
+    {
+        $create = $this->postJson('/portal/create', ['duration' => 5]);
+        $code = $create->json('code');
+        $reservedPeerId = $create->json('peer_id');
+
+        // The creator opens the portal and must keep the reserved slot.
+        $this->get('/p/' . $code)->assertStatus(200);
+
+        $portal = PortalSession::first();
+        $this->assertSame([$reservedPeerId], $portal->peer_ids);
+
+        // A second client claims the remaining slot.
+        $this->flushSession();
+        $this->get('/p/' . $code)->assertStatus(200);
+
+        // A third is rejected while both slots are live.
+        $this->flushSession();
+        $this->get('/p/' . $code)->assertStatus(409);
+    }
+
     public function test_a_third_peer_is_rejected_when_both_slots_are_live(): void
     {
         $portal = PortalSession::create([

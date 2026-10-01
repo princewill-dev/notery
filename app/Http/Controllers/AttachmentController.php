@@ -124,6 +124,12 @@ class AttachmentController extends Controller
             ]);
         }
         } catch (\Throwable $e) {
+            // Preserve framework HTTP exceptions (abort(404) etc.) so missing
+            // files do not get masked as a 500.
+            if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                throw $e;
+            }
+
             Log::error('Attachment download failed', [
                 'id' => $id,
                 'error' => $e->getMessage(),

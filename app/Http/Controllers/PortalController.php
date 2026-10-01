@@ -71,7 +71,10 @@ class PortalController extends Controller
             'status' => 'active',
             // Register the creator's peer slot up front so it is reserved and
             // reused when they open /p/{code} (instead of being discarded).
+            // peer_seen_at must be set too, otherwise the idle filter in show()
+            // drops the reservation immediately.
             'peer_ids' => [$peerId],
+            'peer_seen_at' => [$peerId => now()->getTimestamp()],
         ]);
 
         $request->session()->put('portal_peer_' . $code, $peerId);
@@ -401,11 +404,16 @@ class PortalController extends Controller
         $plainPath = $file->storeAs('notery_tmp', $filename);
         $path = 'notery/' . $filename;
 
-        EncryptedFile::encryptFile(
-            Storage::disk('local')->path($plainPath),
-            Storage::disk('local')->path($path)
-        );
-        Storage::disk('local')->delete($plainPath);
+        // Always drop the plaintext staging copy, even if encryption fails, so
+        // raw bytes cannot linger on disk.
+        try {
+            EncryptedFile::encryptFile(
+                Storage::disk('local')->path($plainPath),
+                Storage::disk('local')->path($path)
+            );
+        } finally {
+            Storage::disk('local')->delete($plainPath);
+        }
 
         $message = $session->messages()->create([
             'type' => $messageType,
@@ -620,7 +628,7 @@ class PortalController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'upload_id' => ['required', 'string', 'regex:/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i'],
-                'attachment_type' => 'nullable|in:' . implode(',', self::ALLOWED_TYPES),
+                'attachment_type' => 'nullable|required_with:files|in:' . implode(',', self::ALLOWED_TYPES),
                 'files' => 'nullable|array',
                 'files.*.index' => 'required_with:files|integer|min:0',
                 'files.*.original_name' => 'required_with:files|string|max:1024',
@@ -671,6 +679,15 @@ class PortalController extends Controller
                 ], 422);
             }
 
+            // The per-portal message cap must also cover the assembly path,
+            // which can insert many file messages at once.
+            if ($session->messages()->count() + count($filesMeta) > self::MAX_MESSAGES_PER_PORTAL) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This portal has reached its message limit',
+                ], 429);
+            }
+
             $preflightLimits = $this->limitsForType($attachmentType);
             $totalUploadBytes = 0;
 
@@ -701,6 +718,7 @@ class PortalController extends Controller
             // failure could orphan files or lose chunks on a rollback.
             $assembledFiles = [];
             $writtenPaths = [];
+            $committed = false;
 
             try {
                 if (!empty($filesMeta)) {
@@ -812,6 +830,9 @@ class PortalController extends Controller
                     }
                 });
 
+                // Rows are committed; never unlink their files from here on.
+                $committed = true;
+
                 // Only remove the chunks once the rows are committed.
                 Storage::disk('local')->deleteDirectory('chunks/' . $uploadId);
 
@@ -820,10 +841,13 @@ class PortalController extends Controller
                     'files_count' => count($assembledFiles),
                 ]);
             } catch (\Throwable $e) {
-                // Remove any output files written before the failure.
-                foreach ($writtenPaths as $path) {
-                    if (is_file($path)) {
-                        @unlink($path);
+                // Remove any output files written before the failure, unless the
+                // rows were already committed (then the files belong to them).
+                if (!$committed) {
+                    foreach ($writtenPaths as $path) {
+                        if (is_file($path)) {
+                            @unlink($path);
+                        }
                     }
                 }
 
@@ -839,7 +863,7 @@ class PortalController extends Controller
                 'error' => $e->getMessage(),
                 'upload_id' => $request->input('upload_id'),
             ]);
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['status' => 'error', 'message' => 'Assembly failed'], 500);
         } catch (\Exception $e) {
             Log::error('Portal assembly failed (unexpected)', [
                 'error' => $e->getMessage(),
@@ -1211,16 +1235,31 @@ class PortalController extends Controller
             return;
         }
 
-        $seenAt = $session->peer_seen_at ?? [];
         $now = now()->getTimestamp();
 
-        if (($seenAt[$peerId] ?? 0) > $now - 30) {
+        if ((($session->peer_seen_at ?? [])[$peerId] ?? 0) > $now - 30) {
             return;
         }
 
-        $seenAt[$peerId] = $now;
-        $session->peer_seen_at = $seenAt;
-        $session->save();
+        // Re-read under a row lock and merge, so a concurrent show() that just
+        // admitted another peer is not clobbered by writing a stale array.
+        DB::transaction(function () use ($session, $peerId, $now) {
+            $locked = PortalSession::whereKey($session->getKey())->lockForUpdate()->first();
+
+            if (!$locked) {
+                return;
+            }
+
+            $seenAt = $locked->peer_seen_at ?? [];
+
+            if (($seenAt[$peerId] ?? 0) > $now - 30) {
+                return;
+            }
+
+            $seenAt[$peerId] = $now;
+            $locked->peer_seen_at = $seenAt;
+            $locked->save();
+        });
     }
 
     /**
